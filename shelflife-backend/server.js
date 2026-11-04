@@ -1,70 +1,51 @@
 const express = require('express');
 const cors = require('cors');
-const con = require('./db_config'); // นำเข้าตัวเชื่อมต่อ DB[cite: 15]
+require('dotenv').config();
+const authRoutes = require('./routes/auth_routes');
+const inventoryRoutes = require('./routes/inventory_routes');
+const productRoutes = require('./routes/product_routes');
+const userRoutes = require('./routes/user_routes');
+
+if (!process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET must be set in the backend environment.');
+}
 
 const app = express();
-app.use(cors()); // รองรับ CORS ให้ Flutter ยิงเข้าถึงได้[cite: 11, 16]
-app.use(express.json()); // อ่าน JSON Request Body[cite: 16]
+app.use(cors());
+app.use(express.json());
 
-// ----------------------------------------------------
-// 1. GET /api/items/:userId - ดึงรายการสินค้าทั้งหมดของผู้ใช้
-// ----------------------------------------------------
-app.get('/api/items/:userId', (req, res) => {
-  const userId = req.params.userId;
-  const sql = "SELECT * FROM inventory_items WHERE user_id = ? AND status = 'active' ORDER BY expiration_date ASC";
-  
-  con.query(sql, [userId], (err, result) => {
-    if (err) {
-      console.error(err.message);
-      return res.status(500).send("Database server error");
-    }
-    res.json(result);
+app.use('/api/auth', authRoutes);
+app.use('/api/items', inventoryRoutes);
+app.use('/api/products', productRoutes);
+app.use('/api/users', userRoutes);
+
+app.use((req, res) => {
+  res.status(404).json({ message: 'Route not found.' });
+});
+
+app.use((error, _req, res, _next) => {
+  if (error.status) {
+    return res.status(error.status).json({ message: error.message });
+  }
+  if (error.code === 'ER_DUP_ENTRY') {
+    return res.status(409).json({ message: 'A record with the same unique value already exists.' });
+  }
+  if (error.code === 'ER_ROW_IS_REFERENCED_2' || error.code === 'ER_NO_REFERENCED_ROW_2') {
+    return res.status(409).json({ message: 'The record is referenced by another record.' });
+  }
+  if (error instanceof SyntaxError && 'body' in error) {
+    return res.status(400).json({ message: 'Request body must contain valid JSON.' });
+  }
+  console.error(error);
+  return res.status(500).json({ message: 'Internal server error.' });
+});
+
+const PORT = Number(process.env.PORT) || 3000;
+const HOST = process.env.HOST || '127.0.0.1';
+if (require.main === module) {
+  app.listen(PORT, HOST, () => {
+    console.log(`Server is running on http://localhost:${PORT}`);
   });
-});
+}
 
-// ----------------------------------------------------
-// 2. POST /api/items - เพิ่มสินค้าใหม่เข้าตู้
-// ----------------------------------------------------
-app.post('/api/items', (req, res) => {
-  const { user_id, barcode, product_name, category, quantity, expiration_date } = req.body;
-  
-  const sql = `INSERT INTO inventory_items 
-               (user_id, barcode, product_name, category, quantity, expiration_date) 
-               VALUES (?, ?, ?, ?, ?, ?)`;
-               
-  con.query(sql, [user_id, barcode, product_name, category || 'General', quantity || 1, expiration_date], (err, result) => {
-    if (err) {
-      console.error(err.message);
-      return res.status(500).send("Error: Database server error");
-    }
-    if (result.affectedRows !== 1) {
-      return res.status(500).send("Error: Incorrect insert");
-    }
-    res.status(201).send('Added successfully');
-  });
-});
-
-// ----------------------------------------------------
-// 3. GET /api/products/master/:barcode - ค้นหาบาร์โค้ดกลาง (Master Catalog)
-// ----------------------------------------------------
-app.get('/api/products/master/:barcode', (req, res) => {
-  const barcode = req.params.barcode;
-  const sql = "SELECT * FROM global_products WHERE barcode = ?";
-  
-  con.query(sql, [barcode], (err, result) => {
-    if (err) {
-      console.error(err.message);
-      return res.status(500).send("Database server error");
-    }
-    if (result.length === 0) {
-      return res.status(404).json({ message: "Barcode not found in master data" });
-    }
-    res.json(result[0]);
-  });
-});
-
-// เริ่มทำงานเซิร์ฟเวอร์ที่ Port 3000
-const PORT = 3000;
-app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
-});
+module.exports = app;

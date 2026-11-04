@@ -1,42 +1,49 @@
-import 'dart:convert';
-import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'api_client.dart';
 import '../models/inventory_item_model.dart';
 
 class InventoryController {
-  // หากรันใน Android Emulator ใช้ 'http://10.0.2.2:3000/api'
-  // หากรันบน Chrome/Windows ใช้ 'http://localhost:3000/api'
-  static const String baseURL = 'http://localhost:3000/api';
+  InventoryController({ApiClient apiClient = const ApiClient()})
+      : _api = apiClient;
 
-  // ดึงรายการสินค้าทั้งหมด
+  final ApiClient _api;
+
   Future<List<InventoryItemModel>> getInventoryItems(int userId) async {
-    try {
-      final response = await http.get(Uri.parse('$baseURL/items/$userId'));
-      if (response.statusCode != 200) {
-        throw Exception('Server error: ${response.statusCode}');
-      }
-      List data = jsonDecode(response.body);
-      return data.map((json) => InventoryItemModel.fromJson(json)).toList();
-    } catch (e) {
-      debugPrint(e.toString());
-      throw Exception('Could not connect to the server.');
-    }
+    final response = await _api.get('/items/$userId');
+    _api.expectStatus(response, 200);
+    final data = _api.decode(response) as List<dynamic>;
+    return data
+        .map((json) => InventoryItemModel.fromJson(
+              Map<String, dynamic>.from(json as Map),
+            ))
+        .toList();
   }
 
-  // เพิ่มสินค้าใหม่
+  Future<InventoryItemModel> getInventoryItem(int userId, int itemId) async {
+    final response = await _api.get('/items/$userId/$itemId');
+    _api.expectStatus(response, 200);
+    return InventoryItemModel.fromJson(
+      Map<String, dynamic>.from(_api.decode(response) as Map),
+    );
+  }
+
   Future<void> addItem(Map<String, dynamic> itemData) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$baseURL/items'),
-        headers: {'Content-Type': 'application/json; charset=UTF-8'},
-        body: jsonEncode(itemData),
-      );
-      if (response.statusCode != 201) {
-        throw Exception('Failed to add item: ${response.statusCode}');
-      }
-    } catch (e) {
-      debugPrint(e.toString());
-      throw Exception('Could not connect to the server.');
-    }
+    final response = await _api.post('/items', itemData);
+    _api.expectStatus(response, 201);
+  }
+
+  Future<InventoryItemModel> updateItem(
+    int itemId,
+    Map<String, dynamic> changes,
+  ) async {
+    final response = await _api.patch('/items/$itemId', changes);
+    _api.expectStatus(response, 200);
+    return InventoryItemModel.fromJson(
+      Map<String, dynamic>.from(_api.decode(response) as Map),
+    );
+  }
+
+  Future<void> deleteItem(int itemId) async {
+    final response = await _api.delete('/items/$itemId');
+    _api.expectStatus(response, 204);
   }
 }

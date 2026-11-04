@@ -1,11 +1,11 @@
 const mysql = require('mysql2');
+require('dotenv').config();
 
-// เชื่อมต่อ MySQL บน XAMPP
 const con = mysql.createConnection({
-  host: 'localhost',
-  user: 'root',      // Default user ของ XAMPP
-  password: '',      // Default password ของ XAMPP มักเป็นค่าว่าง
-  database: 'shelflife_db'
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || '',
+  database: process.env.DB_NAME || 'shelflife_db',
 });
 
 con.connect((err) => {
