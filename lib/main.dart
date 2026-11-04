@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'views/master_catalog_view.dart';
+import 'views/admin_main_view.dart'; // 1. เปลี่ยนมา import ตัว admin_main_view.dart
 
 void main() {
   runApp(const MyApp());
@@ -17,7 +17,7 @@ class MyApp extends StatelessWidget {
         primaryColor: const Color(0xFF0D7A53),
         useMaterial3: true,
       ),
-      home: const MasterCatalogView(),
+      home: const AdminMainView(), // 2. เปลี่ยนตรงนี้เป็น AdminMainView()
     );
   }
 }
