@@ -3,7 +3,9 @@ import '../models/mock_data.dart';
 import 'add_edit_barcode_view.dart';
 
 class MasterCatalogView extends StatefulWidget {
-  const MasterCatalogView({super.key});
+  final VoidCallback? onBackToDashboard;
+
+  const MasterCatalogView({super.key, this.onBackToDashboard});
 
   @override
   State<MasterCatalogView> createState() => _MasterCatalogViewState();
@@ -15,7 +17,6 @@ class _MasterCatalogViewState extends State<MasterCatalogView> {
 
   @override
   Widget build(BuildContext context) {
-    // Filter สินค้าตามหมวดหมู่และคำค้นหา
     final filteredProducts = MockData.globalProducts.where((item) {
       final barcode = (item['barcode'] ?? '').toLowerCase();
       final productName = (item['product_name'] ?? '').toLowerCase();
@@ -23,215 +24,208 @@ class _MasterCatalogViewState extends State<MasterCatalogView> {
 
       final matchesSearch = barcode.contains(searchQuery.toLowerCase()) ||
           productName.contains(searchQuery.toLowerCase());
-
-      final matchesCategory =
-          selectedCategory == 'All' || category == selectedCategory;
+      final matchesCategory = selectedCategory == 'All' || category == selectedCategory;
 
       return matchesSearch && matchesCategory;
     }).toList();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Global Product Catalog'),
-        backgroundColor: const Color(0xFF0D7A53),
-        foregroundColor: Colors.white,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            // Add Barcode Button
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  // เพิ่มส่วนเปิดหน้า AddEditBarcodeView ตรงนี้
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const AddEditBarcodeView(),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.add, color: Colors.white),
-                label: const Text(
-                  'Add Barcode',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                  ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0D7A53),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // Search Barcode / Product Name
-            TextField(
-              onChanged: (value) {
-                setState(() {
-                  searchQuery = value;
-                });
-              },
-              decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.search),
-                hintText: 'Search by barcode or product name...',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  vertical: 10,
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
-            // Category Filter Chips
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top Bar
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  'All (350)',
-                  'Food (210)',
-                  'Medicine (85)',
-                  'Other (55)'
-                ].map((cat) {
-                  final category = cat.split(' ')[0];
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+                    onPressed: widget.onBackToDashboard,
+                  ),
+                  const Column(
+                    children: [
+                      Text(
+                        'Global Product Catalog',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        'Manage barcode product database',
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.settings_outlined, size: 24),
+                    onPressed: () {},
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
 
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8.0),
-                    child: ChoiceChip(
-                      label: Text(cat),
-                      selected: selectedCategory == category,
-                      onSelected: (selected) {
-                        setState(() {
-                          selectedCategory = category;
-                        });
-                      },
-                      selectedColor: const Color(0xFF0D7A53),
-                      labelStyle: TextStyle(
-                        color: selectedCategory == category
-                            ? Colors.white
-                            : Colors.black,
+              // Add Barcode Button
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const AddEditBarcodeView()),
+                    );
+                  },
+                  icon: const Icon(Icons.add, color: Colors.white),
+                  label: const Text(
+                    'Add Barcode',
+                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0D7A53),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Search Row
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      onChanged: (val) => setState(() => searchQuery = val),
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                        hintText: 'Search by barcode or product name...',
+                        hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: Colors.grey.shade200),
+                        ),
                       ),
                     ),
-                  );
-                }).toList(),
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
-            // Product List
-            Expanded(
-              child: filteredProducts.isEmpty
-                  ? const Center(
-                      child: Text('No products found'),
-                    )
-                  : ListView.builder(
-                      itemCount: filteredProducts.length,
-                      itemBuilder: (context, index) {
-                        final item = filteredProducts[index];
-
-                        return Card(
-                          margin: const EdgeInsets.symmetric(vertical: 6),
-                          child: ListTile(
-                            leading: Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade200,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Icon(
-                                Icons.fastfood,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            title: Text(
-                              item['barcode'] ?? '',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            subtitle: Text(
-                              '${item['product_name'] ?? ''}\n${item['category'] ?? ''}',
-                            ),
-                            isThreeLine: true,
-                            trailing: PopupMenuButton<String>(
-                              onSelected: (value) {
-                                if (value == 'edit') {
-                                  // เปิดหน้า Edit พร้อมส่งข้อมูลสินค้าปัจจุบันไปแสดง
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => AddEditBarcodeView(
-                                        initialData: item,
-                                      ),
-                                    ),
-                                  );
-                                } else if (value == 'delete') {
-                                  // แสดง Pop-up ยืนยันการลบข้อมูล
-                                  showDialog(
-                                    context: context,
-                                    builder: (context) => AlertDialog(
-                                      title: const Text('Confirm Delete'),
-                                      content: Text(
-                                        'Are you sure you want to delete barcode ${item['barcode']}?',
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () =>
-                                              Navigator.pop(context),
-                                          child: const Text('Cancel'),
-                                        ),
-                                        TextButton(
-                                          onPressed: () {
-                                            Navigator.pop(context);
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                              const SnackBar(
-                                                content: Text(
-                                                    'Deleted successfully!'),
-                                                backgroundColor: Colors.red,
-                                              ),
-                                            );
-                                          },
-                                          child: const Text(
-                                            'Delete',
-                                            style: TextStyle(color: Colors.red),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                }
-                              },
-                              itemBuilder: (context) => [
-                                const PopupMenuItem(
-                                  value: 'edit',
-                                  child: Text('Edit'),
-                                ),
-                                const PopupMenuItem(
-                                  value: 'delete',
-                                  child: Text('Delete'),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.grey.shade200),
                     ),
-            ),
-          ],
+                    child: IconButton(
+                      icon: const Icon(Icons.tune_rounded, color: Colors.black87),
+                      onPressed: () {},
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Category Filter Chips
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: ['All (350)', 'Food (210)', 'Medicine (85)', 'Other (55)'].map((cat) {
+                    final category = cat.split(' ')[0];
+                    final isSelected = selectedCategory == category;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8.0),
+                      child: ChoiceChip(
+                        label: Text(cat),
+                        selected: isSelected,
+                        onSelected: (selected) {
+                          setState(() => selectedCategory = category);
+                        },
+                        selectedColor: const Color(0xFF0D7A53),
+                        backgroundColor: Colors.grey.shade100,
+                        labelStyle: TextStyle(
+                          color: isSelected ? Colors.white : Colors.grey.shade700,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          fontSize: 12,
+                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        side: BorderSide.none,
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // Product List
+              Expanded(
+                child: filteredProducts.isEmpty
+                    ? const Center(child: Text('No products found'))
+                    : ListView.builder(
+                        itemCount: filteredProducts.length,
+                        itemBuilder: (context, index) {
+                          final item = filteredProducts[index];
+                          return Card(
+                            elevation: 0,
+                            color: Colors.white,
+                            margin: const EdgeInsets.symmetric(vertical: 4),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(color: Colors.grey.shade100),
+                            ),
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              leading: Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade100,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(Icons.shopping_bag_outlined, color: Color(0xFF0D7A53)),
+                              ),
+                              title: Text(
+                                item['barcode'] ?? '',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(item['product_name'] ?? '', style: const TextStyle(fontSize: 13)),
+                                  Text(
+                                    item['category'] ?? '',
+                                    style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                                  ),
+                                ],
+                              ),
+                              trailing: PopupMenuButton<String>(
+                                icon: const Icon(Icons.more_vert, color: Colors.grey),
+                                onSelected: (val) {
+                                  if (val == 'edit') {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => AddEditBarcodeView(initialData: item),
+                                      ),
+                                    );
+                                  }
+                                },
+                                itemBuilder: (context) => [
+                                  const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                                  const PopupMenuItem(value: 'delete', child: Text('Delete')),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
         ),
       ),
     );
