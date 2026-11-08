@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'views/admin_main_view.dart'; // 1. เปลี่ยนมา import ตัว admin_main_view.dart
+import 'package:myapp/views/admin_main_view.dart';
+
 
 void main() {
   runApp(const MyApp());
