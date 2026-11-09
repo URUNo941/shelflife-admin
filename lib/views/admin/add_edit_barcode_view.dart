@@ -2,8 +2,13 @@ import 'package:flutter/material.dart';
 
 class AddEditBarcodeView extends StatefulWidget {
   final Map<String, String>? initialData; // ถ้าส่งข้อมูลมา = หน้า Edit, ถ้า null = หน้า Add
+  final Set<String> existingBarcodes;
 
-  const AddEditBarcodeView({super.key, this.initialData});
+  const AddEditBarcodeView({
+    super.key,
+    this.initialData,
+    this.existingBarcodes = const {},
+  });
 
   @override
   State<AddEditBarcodeView> createState() => _AddEditBarcodeViewState();
@@ -42,15 +47,11 @@ class _AddEditBarcodeViewState extends State<AddEditBarcodeView> {
 
   void _saveForm() {
     if (_formKey.currentState!.validate()) {
-      // ตัวอย่างเมื่อบันทึกข้อมูลเรียบร้อย
-      final isEdit = widget.initialData != null;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(isEdit ? 'Updated successfully!' : 'Added successfully!'),
-          backgroundColor: const Color(0xFF0D7A53),
-        ),
-      );
-      Navigator.pop(context);
+      Navigator.pop(context, {
+        'barcode': _barcodeController.text.trim(),
+        'product_name': _nameController.text.trim(),
+        'category': _selectedCategory,
+      });
     }
   }
 
@@ -83,8 +84,15 @@ class _AddEditBarcodeViewState extends State<AddEditBarcodeView> {
                 ),
                 keyboardType: TextInputType.number,
                 validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
+                  final barcode = value?.trim() ?? '';
+                  if (barcode.isEmpty) {
                     return 'Please enter barcode number';
+                  }
+                  if (!RegExp(r'^\d+$').hasMatch(barcode)) {
+                    return 'Barcode must contain numbers only';
+                  }
+                  if (widget.existingBarcodes.contains(barcode)) {
+                    return 'This barcode already exists';
                   }
                   return null;
                 },
@@ -113,7 +121,7 @@ class _AddEditBarcodeViewState extends State<AddEditBarcodeView> {
 
               // เลือก Category
               DropdownButtonFormField<String>(
-                value: _selectedCategory,
+                initialValue: _selectedCategory,
                 decoration: InputDecoration(
                   labelText: 'Category',
                   prefixIcon: const Icon(Icons.category_outlined),

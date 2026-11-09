@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../models/mock_data.dart';
+import '../../models/mock_data.dart';
 import 'add_edit_barcode_view.dart';
 
 class MasterCatalogView extends StatefulWidget {
@@ -14,6 +14,149 @@ class MasterCatalogView extends StatefulWidget {
 class _MasterCatalogViewState extends State<MasterCatalogView> {
   String selectedCategory = 'All';
   String searchQuery = '';
+  String sortBy = 'Barcode';
+
+  Future<void> _addBarcode() async {
+    final result = await Navigator.push<Map<String, String>>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddEditBarcodeView(
+          existingBarcodes: MockData.globalProducts
+              .map((item) => item['barcode'] ?? '')
+              .toSet(),
+        ),
+      ),
+    );
+
+    if (result != null) {
+      setState(() => MockData.globalProducts.add(result));
+      _showMessage('Barcode added');
+    }
+  }
+
+  Future<void> _editBarcode(Map<String, String> item) async {
+    final result = await Navigator.push<Map<String, String>>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddEditBarcodeView(
+          initialData: Map<String, String>.from(item),
+          existingBarcodes: MockData.globalProducts
+              .where((product) => !identical(product, item))
+              .map((product) => product['barcode'] ?? '')
+              .toSet(),
+        ),
+      ),
+    );
+
+    if (result != null) {
+      item
+        ..clear()
+        ..addAll(result);
+      setState(() {});
+      _showMessage('Barcode updated');
+    }
+  }
+
+  Future<void> _deleteBarcode(Map<String, String> item) async {
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete barcode?'),
+        content: Text(
+          'Remove ${item['product_name'] ?? 'this product'} from the catalog?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldDelete == true) {
+      setState(() => MockData.globalProducts.remove(item));
+      _showMessage('Barcode deleted');
+    }
+  }
+
+  Future<void> _showCategoryFilter() async {
+    final categories = [
+      'All',
+      ...MockData.globalProducts
+          .map((item) => item['category'] ?? 'Other')
+          .toSet()
+          .toList()
+        ..sort(),
+    ];
+    final category = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            const ListTile(
+              title: Text('Filter by category',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+            ...categories.map(
+              (category) => ListTile(
+                title: Text(category),
+                trailing: selectedCategory == category
+                    ? const Icon(Icons.check, color: Color(0xFF0D7A53))
+                    : null,
+                onTap: () => Navigator.pop(context, category),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (category != null) {
+      setState(() => selectedCategory = category);
+    }
+  }
+
+  Future<void> _showSortOptions() async {
+    final sort = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            const ListTile(
+              title: Text('Sort products',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+            for (final option in ['Barcode', 'Name', 'Category'])
+              ListTile(
+                title: Text(option),
+                trailing: sortBy == option
+                    ? const Icon(Icons.check, color: Color(0xFF0D7A53))
+                    : null,
+                onTap: () => Navigator.pop(context, option),
+              ),
+          ],
+        ),
+      ),
+    );
+
+    if (sort != null) {
+      setState(() => sortBy = sort);
+    }
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -28,6 +171,22 @@ class _MasterCatalogViewState extends State<MasterCatalogView> {
 
       return matchesSearch && matchesCategory;
     }).toList();
+    filteredProducts.sort(
+      (a, b) => (a[{
+        'Barcode': 'barcode',
+        'Name': 'product_name',
+        'Category': 'category',
+      }[sortBy]] ??
+              '')
+          .compareTo(
+            b[{
+              'Barcode': 'barcode',
+              'Name': 'product_name',
+              'Category': 'category',
+            }[sortBy]] ??
+                '',
+          ),
+    );
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -59,7 +218,8 @@ class _MasterCatalogViewState extends State<MasterCatalogView> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.settings_outlined, size: 24),
-                    onPressed: () {},
+                    tooltip: 'Sort catalog',
+                    onPressed: _showSortOptions,
                   ),
                 ],
               ),
@@ -70,12 +230,7 @@ class _MasterCatalogViewState extends State<MasterCatalogView> {
                 width: double.infinity,
                 height: 48,
                 child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const AddEditBarcodeView()),
-                    );
-                  },
+                  onPressed: _addBarcode,
                   icon: const Icon(Icons.add, color: Colors.white),
                   label: const Text(
                     'Add Barcode',
@@ -123,7 +278,8 @@ class _MasterCatalogViewState extends State<MasterCatalogView> {
                     ),
                     child: IconButton(
                       icon: const Icon(Icons.tune_rounded, color: Colors.black87),
-                      onPressed: () {},
+                      tooltip: 'Filter category',
+                      onPressed: _showCategoryFilter,
                     ),
                   ),
                 ],
@@ -134,13 +290,24 @@ class _MasterCatalogViewState extends State<MasterCatalogView> {
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
-                  children: ['All (350)', 'Food (210)', 'Medicine (85)', 'Other (55)'].map((cat) {
-                    final category = cat.split(' ')[0];
+                  children: [
+                    'All',
+                    ...MockData.globalProducts
+                        .map((item) => item['category'] ?? 'Other')
+                        .toSet()
+                        .toList()
+                      ..sort(),
+                  ].map((category) {
+                    final count = category == 'All'
+                        ? MockData.globalProducts.length
+                        : MockData.globalProducts
+                            .where((item) => item['category'] == category)
+                            .length;
                     final isSelected = selectedCategory == category;
                     return Padding(
                       padding: const EdgeInsets.only(right: 8.0),
                       child: ChoiceChip(
-                        label: Text(cat),
+                        label: Text('$category ($count)'),
                         selected: isSelected,
                         onSelected: (selected) {
                           setState(() => selectedCategory = category);
@@ -206,13 +373,10 @@ class _MasterCatalogViewState extends State<MasterCatalogView> {
                                 icon: const Icon(Icons.more_vert, color: Colors.grey),
                                 onSelected: (val) {
                                   if (val == 'edit') {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => AddEditBarcodeView(initialData: item),
-                                      ),
-                                    );
-                                  }
+                                      _editBarcode(item);
+                                    } else if (val == 'delete') {
+                                      _deleteBarcode(item);
+                                    }
                                 },
                                 itemBuilder: (context) => [
                                   const PopupMenuItem(value: 'edit', child: Text('Edit')),

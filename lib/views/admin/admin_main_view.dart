@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'admin_dashboard_view.dart';
 import 'master_catalog_view.dart';
 import 'user_management_view.dart';
-import 'system_analytics_view.dart'; // <-- 1. เพิ่ม import ไฟล์ใหม่
+import 'system_analytics_view.dart';
 
 class AdminMainView extends StatefulWidget {
   const AdminMainView({super.key});
@@ -18,7 +18,7 @@ class _AdminMainViewState extends State<AdminMainView> {
   Widget build(BuildContext context) {
     final List<Widget> pages = [
       AdminDashboardView(
-        onNavigateToCatalog: (index) {
+        onNavigateToTab: (index) {
           setState(() {
             _currentIndex = index;
           });
@@ -38,13 +38,16 @@ class _AdminMainViewState extends State<AdminMainView> {
           });
         },
       ),
-      const SystemAnalyticsView(), // <-- 2. เปลี่ยนแท็บที่ 4 เป็น SystemAnalyticsView
+      const SystemAnalyticsView(),
     ];
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: SafeArea(
-        child: pages[_currentIndex],
+        child: IndexedStack(
+          index: _currentIndex,
+          children: pages,
+        ),
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,

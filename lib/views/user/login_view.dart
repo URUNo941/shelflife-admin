@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'master_catalog_view.dart';
+import '../admin/master_catalog_view.dart';
 
 class LoginView extends StatefulWidget {
   const LoginView({super.key});

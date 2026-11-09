@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../controllers/inventory_controller.dart';
-import '../models/inventory_item_model.dart';
+import '../../controllers/inventory_controller.dart';
+import '../../models/inventory_item_model.dart';
 
 class InventoryListView extends StatefulWidget {
   const InventoryListView({super.key});

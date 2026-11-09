@@ -12,6 +12,7 @@ class UserManagementView extends StatefulWidget {
 
 class _UserManagementViewState extends State<UserManagementView> {
   String searchQuery = '';
+  String selectedRole = 'All';
 
   // Mock data รายชื่อผู้ใช้
   final List<Map<String, String>> usersList = [
@@ -24,13 +25,173 @@ class _UserManagementViewState extends State<UserManagementView> {
     {'username': 'winm', 'role': 'User', 'joinedDate': 'Oct 20, 2026'},
   ];
 
+  Future<Map<String, String>?> _showUserEditor({
+    Map<String, String>? user,
+  }) async {
+    final usernameController = TextEditingController(
+      text: user?['username'] ?? '',
+    );
+    final formKey = GlobalKey<FormState>();
+    var role = user?['role'] ?? 'User';
+    final result = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(user == null ? 'Add user' : 'Edit user'),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: usernameController,
+                  autofocus: true,
+                  decoration: const InputDecoration(labelText: 'Username'),
+                  validator: (value) {
+                    final username = value?.trim() ?? '';
+                    if (username.isEmpty) return 'Enter a username';
+                    final alreadyExists = usersList.any(
+                      (existingUser) =>
+                          existingUser != user &&
+                          (existingUser['username'] ?? '').toLowerCase() ==
+                              username.toLowerCase(),
+                    );
+                    if (alreadyExists) return 'Username already exists';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: role,
+                  decoration: const InputDecoration(labelText: 'Role'),
+                  items: const [
+                    DropdownMenuItem(value: 'User', child: Text('User')),
+                    DropdownMenuItem(value: 'Admin', child: Text('Admin')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      setDialogState(() => role = value);
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (!formKey.currentState!.validate()) return;
+                Navigator.pop(context, {
+                  'username': usernameController.text.trim(),
+                  'role': role,
+                  'joinedDate': user?['joinedDate'] ??
+                      DateTime.now().toLocal().toString().split(' ').first,
+                });
+              },
+              child: Text(user == null ? 'Add' : 'Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+    usernameController.dispose();
+    return result;
+  }
+
+  Future<void> _addUser() async {
+    final user = await _showUserEditor();
+    if (user == null) return;
+    setState(() => usersList.add(user));
+    _showMessage('User added');
+  }
+
+  Future<void> _editUser(Map<String, String> user) async {
+    final updatedUser = await _showUserEditor(user: user);
+    if (updatedUser == null) return;
+    setState(() {
+      user
+        ..clear()
+        ..addAll(updatedUser);
+    });
+    _showMessage('User updated');
+  }
+
+  Future<void> _deleteUser(Map<String, String> user) async {
+    if (user['role'] == 'Admin' &&
+        usersList.where((entry) => entry['role'] == 'Admin').length == 1) {
+      _showMessage('The last administrator cannot be deleted');
+      return;
+    }
+
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete user?'),
+        content: Text('Remove ${user['username']} from user management?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (shouldDelete == true) {
+      setState(() => usersList.remove(user));
+      _showMessage('User deleted');
+    }
+  }
+
+  Future<void> _showRoleFilter() async {
+    final role = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ListTile(
+              title: Text('Filter users',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+            for (final option in ['All', 'Admin', 'User'])
+              ListTile(
+                title: Text(option),
+                trailing: selectedRole == option
+                    ? const Icon(Icons.check, color: Color(0xFF0D7A53))
+                    : null,
+                onTap: () => Navigator.pop(context, option),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (role != null) setState(() => selectedRole = role);
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // กรองค้นหาตาม Username
     final filteredUsers = usersList.where((u) {
-      return (u['username'] ?? '')
-          .toLowerCase()
-          .contains(searchQuery.toLowerCase());
+      final matchesSearch =
+          ('${u['username']} ${u['role']}')
+              .toLowerCase()
+              .contains(searchQuery.toLowerCase());
+      final matchesRole = selectedRole == 'All' || u['role'] == selectedRole;
+      return matchesSearch && matchesRole;
     }).toList();
 
     return Scaffold(
@@ -63,9 +224,7 @@ class _UserManagementViewState extends State<UserManagementView> {
                     ),
                   ),
                   ElevatedButton.icon(
-                    onPressed: () {
-                      // Action สำหรับ Add User
-                    },
+                    onPressed: _addUser,
                     icon: const Icon(
                       Icons.add,
                       color: Colors.white,
@@ -150,7 +309,8 @@ class _UserManagementViewState extends State<UserManagementView> {
                         Icons.tune_rounded,
                         color: Colors.black87,
                       ),
-                      onPressed: () {},
+                      tooltip: 'Filter by role',
+                      onPressed: _showRoleFilter,
                     ),
                   ),
                 ],
@@ -311,7 +471,13 @@ class _UserManagementViewState extends State<UserManagementView> {
                                       color: Colors.grey,
                                       size: 20,
                                     ),
-                                    onSelected: (val) {},
+                                    onSelected: (val) {
+                                      if (val == 'edit') {
+                                        _editUser(user);
+                                      } else if (val == 'delete') {
+                                        _deleteUser(user);
+                                      }
+                                    },
                                     itemBuilder: (context) => [
                                       const PopupMenuItem(
                                         value: 'edit',

@@ -10,8 +10,21 @@ class SystemAnalyticsView extends StatefulWidget {
 class _SystemAnalyticsViewState extends State<SystemAnalyticsView> {
   String selectedPeriod = 'This Month';
 
+  static const _periodItemStats = {
+    'Today': {'active': 42, 'consumed': 6, 'discarded': 2},
+    'This Week': {'active': 302, 'consumed': 56, 'discarded': 22},
+    'This Month': {'active': 980, 'consumed': 180, 'discarded': 80},
+    'This Year': {'active': 1120, 'consumed': 245, 'discarded': 115},
+  };
+
   @override
   Widget build(BuildContext context) {
+    final itemStats = _periodItemStats[selectedPeriod]!;
+    final activeItems = itemStats['active']!;
+    final consumedItems = itemStats['consumed']!;
+    final discardedItems = itemStats['discarded']!;
+    final totalItems = activeItems + consumedItems + discardedItems;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: SafeArea(
@@ -101,14 +114,14 @@ class _SystemAnalyticsViewState extends State<SystemAnalyticsView> {
                     icon: Icons.widgets_outlined,
                     iconBgColor: const Color(0xFFFEF3C7),
                     iconColor: const Color(0xFFD97706),
-                    value: '1,240',
+                    value: totalItems.toString(),
                     label: 'Inventory Items',
                   ),
                   _buildStatCard(
                     icon: Icons.warning_amber_rounded,
                     iconBgColor: const Color(0xFFFEE2E2),
                     iconColor: const Color(0xFFDC2626),
-                    value: '42',
+                    value: discardedItems.toString(),
                     label: 'Expired Items',
                   ),
                 ],
@@ -138,13 +151,17 @@ class _SystemAnalyticsViewState extends State<SystemAnalyticsView> {
                       children: [
                         CustomPaint(
                           size: const Size(150, 150),
-                          painter: DonutChartPainter(),
+                          painter: DonutChartPainter(
+                            activeRatio: activeItems / totalItems,
+                            consumedRatio: consumedItems / totalItems,
+                            discardedRatio: discardedItems / totalItems,
+                          ),
                         ),
-                        const Column(
+                        Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              '1,240',
+                              totalItems.toString(),
                               style: TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
@@ -173,19 +190,22 @@ class _SystemAnalyticsViewState extends State<SystemAnalyticsView> {
                         _buildLegendItem(
                           color: const Color(0xFF10B981),
                           label: 'Active',
-                          value: '980 (79%)',
+                          value:
+                              '$activeItems (${(activeItems * 100 / totalItems).round()}%)',
                         ),
                         const SizedBox(height: 16),
                         _buildLegendItem(
                           color: const Color(0xFF0EA5E9),
                           label: 'Consumed',
-                          value: '180 (15%)',
+                          value:
+                              '$consumedItems (${(consumedItems * 100 / totalItems).round()}%)',
                         ),
                         const SizedBox(height: 16),
                         _buildLegendItem(
                           color: const Color(0xFFEF4444),
                           label: 'Discarded',
-                          value: '80 (6%)',
+                          value:
+                              '$discardedItems (${(discardedItems * 100 / totalItems).round()}%)',
                         ),
                       ],
                     ),
@@ -296,6 +316,16 @@ class _SystemAnalyticsViewState extends State<SystemAnalyticsView> {
 
 // วาดกราฟวงกลม Donut Chart ด้วย CustomPainter
 class DonutChartPainter extends CustomPainter {
+  final double activeRatio;
+  final double consumedRatio;
+  final double discardedRatio;
+
+  const DonutChartPainter({
+    required this.activeRatio,
+    required this.consumedRatio,
+    required this.discardedRatio,
+  });
+
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
@@ -323,25 +353,26 @@ class DonutChartPainter extends CustomPainter {
     final rect =
         Rect.fromCircle(center: center, radius: radius - strokeWidth / 2);
 
-    // 79% Active, 15% Consumed, 6% Discarded
-    const activeAngle = 2 * 3.141592653589793 * 0.77;
-    const consumedAngle = 2 * 3.141592653589793 * 0.14;
-    const discardedAngle = 2 * 3.141592653589793 * 0.05;
+    const fullCircle = 2 * 3.141592653589793;
+    const gap = 0.08;
+    final activeAngle = fullCircle * activeRatio - gap;
+    final consumedAngle = fullCircle * consumedRatio - gap;
+    final discardedAngle = fullCircle * discardedRatio - gap;
 
     double startAngle = -3.141592653589793 / 2;
 
-    // Active (เขียว)
     canvas.drawArc(rect, startAngle, activeAngle, false, paintActive);
-    startAngle += activeAngle + 0.08; // gap
+    startAngle += activeAngle + gap;
 
-    // Consumed (ฟ้า)
     canvas.drawArc(rect, startAngle, consumedAngle, false, paintConsumed);
-    startAngle += consumedAngle + 0.08; // gap
+    startAngle += consumedAngle + gap;
 
-    // Discarded (แดง)
     canvas.drawArc(rect, startAngle, discardedAngle, false, paintDiscarded);
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant DonutChartPainter oldDelegate) =>
+      activeRatio != oldDelegate.activeRatio ||
+      consumedRatio != oldDelegate.consumedRatio ||
+      discardedRatio != oldDelegate.discardedRatio;
 }

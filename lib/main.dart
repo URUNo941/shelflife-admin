@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:myapp/views/admin_main_view.dart';
+import 'package:myapp/views/admin/admin_main_view.dart';
 
 
 void main() {
