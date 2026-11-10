@@ -3,10 +3,13 @@ import 'package:flutter/material.dart';
 import 'user_data.dart';
 import 'user_inventory_view.dart';
 import 'user_item_form_view.dart';
+import 'user_profile_view.dart';
 
 /// โครงหลักฝั่ง User: แท็บ Home / Inventory + ปุ่มเพิ่มสินค้า
 class UserMainView extends StatefulWidget {
-  const UserMainView({super.key});
+  /// เรียกเมื่อผู้ใช้กดยืนยัน Log out (ส่งมาจากจุดที่เปิดหน้านี้ เช่น หลัง login)
+  final VoidCallback? onLogout;
+  const UserMainView({super.key, this.onLogout});
 
   @override
   State<UserMainView> createState() => _UserMainViewState();
@@ -22,26 +25,31 @@ class _UserMainViewState extends State<UserMainView> {
       appBar: AppBar(
         backgroundColor: kUserGreen,
         foregroundColor: Colors.white,
-        title: Text(_index == 0 ? 'Home' : 'My Inventory'),
+        title: Text(const ['Home', 'My Inventory', 'My Account'][_index]),
       ),
-      body: _index == 0
-          ? UserHomeView(onSeeAll: () => setState(() => _index = 1))
-          : const UserInventoryView(),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: kUserGreen,
-        foregroundColor: Colors.white,
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const UserItemFormView()),
-        ),
-        child: const Icon(Icons.add),
-      ),
+      body: switch (_index) {
+        0 => UserHomeView(onSeeAll: () => setState(() => _index = 1)),
+        1 => const UserInventoryView(),
+        _ => UserProfileView(onLogout: widget.onLogout),
+      },
+      floatingActionButton: _index == 2
+          ? null
+          : FloatingActionButton(
+              backgroundColor: kUserGreen,
+              foregroundColor: Colors.white,
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const UserItemFormView()),
+              ),
+              child: const Icon(Icons.add),
+            ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
         destinations: const [
           NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Home'),
           NavigationDestination(icon: Icon(Icons.inventory_2_outlined), label: 'Inventory'),
+          NavigationDestination(icon: Icon(Icons.person_outline), label: 'Account'),
         ],
       ),
     );
