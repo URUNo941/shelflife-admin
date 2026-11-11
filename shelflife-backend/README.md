@@ -20,6 +20,14 @@
 
 API ยังส่ง `barcode`, `product_name`, `category` เหมือนเดิม (อ่านผ่าน JOIN) Flutter จึงไม่ต้องแก้
 
+เอกสารประกอบ (โฟลเดอร์ `database/`):
+
+| ไฟล์ | คืออะไร |
+|---|---|
+| `ShelfLife_ER_Diagram_V2.pdf` / `.png` | ER diagram V2 (ไฟล์ต้นฉบับ `.svg` แก้ได้) |
+| `ShelfLife_Data_Dictionary_V2.pdf` | พจนานุกรมข้อมูล export จาก phpMyAdmin: ชนิด, NULL, ค่า default, FK ทุกคอลัมน์ |
+| `ShelfLife_ER_Diagram.pdf` | ER diagram แบบเก่า (V1) เก็บไว้เทียบก่อน/หลัง |
+
 ## ทดสอบ
 
 ```
