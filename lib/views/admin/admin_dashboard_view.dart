@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import '../user/login_view.dart' show LoginView;
 
@@ -73,7 +72,8 @@ class AdminDashboardView extends StatelessWidget {
               Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.notifications_none_rounded, size: 28),
+                    icon:
+                        const Icon(Icons.notifications_none_rounded, size: 28),
                     onPressed: () {
                       showDialog<void>(
                         context: context,
@@ -95,7 +95,8 @@ class AdminDashboardView extends StatelessWidget {
                                 leading: Icon(Icons.person_add_alt_1,
                                     color: Color(0xFF0D7A53)),
                                 title: Text('New users this month'),
-                                subtitle: Text('Check the user management page'),
+                                subtitle:
+                                    Text('Check the user management page'),
                               ),
                             ],
                           ),
@@ -123,8 +124,7 @@ class AdminDashboardView extends StatelessWidget {
                               leading: CircleAvatar(
                                 backgroundColor: Color(0xFFDCFCE7),
                                 child: Text('A',
-                                    style: TextStyle(
-                                        color: Color(0xFF0D7A53))),
+                                    style: TextStyle(color: Color(0xFF0D7A53))),
                               ),
                               title: Text('Admin'),
                               subtitle: Text('Administrator account'),
@@ -136,8 +136,7 @@ class AdminDashboardView extends StatelessWidget {
                               ),
                               FilledButton.icon(
                                 onPressed: () async {
-                                  final shouldLogout =
-                                      await showDialog<bool>(
+                                  final shouldLogout = await showDialog<bool>(
                                     context: context,
                                     builder: (context) => AlertDialog(
                                       title: const Text('Log out?'),
@@ -212,7 +211,10 @@ class AdminDashboardView extends StatelessWidget {
           // Title Section
           const Text(
             'Admin Console',
-            style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.black87),
+            style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87),
           ),
           const SizedBox(height: 4),
           Text(
@@ -221,7 +223,10 @@ class AdminDashboardView extends StatelessWidget {
           ),
           const Text(
             'Admin',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+            style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87),
           ),
           const SizedBox(height: 24),
 
@@ -269,7 +274,10 @@ class AdminDashboardView extends StatelessWidget {
           // Quick Actions Title
           const Text(
             'Quick Actions',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+            style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87),
           ),
           const SizedBox(height: 16),
 
@@ -333,7 +341,8 @@ class AdminDashboardView extends StatelessWidget {
               const SizedBox(width: 12),
               Text(
                 value,
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                style:
+                    const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -352,12 +361,13 @@ class AdminDashboardView extends StatelessWidget {
     required String title,
     required VoidCallback onTap,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
+    return Material(
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey.shade200),
+        side: BorderSide(color: Colors.grey.shade200),
       ),
+      clipBehavior: Clip.antiAlias,
       child: ListTile(
         onTap: onTap,
         leading: Icon(icon, color: const Color(0xFF0D7A53), size: 26),
@@ -365,7 +375,8 @@ class AdminDashboardView extends StatelessWidget {
           title,
           style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
         ),
-        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+        trailing: const Icon(Icons.arrow_forward_ios_rounded,
+            size: 16, color: Colors.grey),
       ),
     );
   }

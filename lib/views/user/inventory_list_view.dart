@@ -12,20 +12,6 @@ class InventoryListView extends StatefulWidget {
 class _InventoryListViewState extends State<InventoryListView> {
   final InventoryController _controller = InventoryController();
 
-  // Logic คำนวณสีตามวันหมดอายุ
-  Color _getExpiryColor(DateTime expDate) {
-    final now = DateTime.now();
-    final difference = expDate.difference(DateTime(now.year, now.month, now.day)).inDays;
-
-    if (difference < 0) {
-      return Colors.red.shade100; // หมดอายุแล้ว (Red)
-    } else if (difference <= 3) {
-      return Colors.amber.shade100; // ใกล้หมดอายุภายใน 3 วัน (Yellow)
-    } else {
-      return Colors.green.shade100; // ปลอดภัย (Green)
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -49,7 +35,7 @@ class _InventoryListViewState extends State<InventoryListView> {
             itemCount: items.length,
             itemBuilder: (context, index) {
               final item = items[index];
-              final cardColor = _getExpiryColor(item.expirationDate);
+              final cardColor = item.expiryColor.withValues(alpha: 0.12);
 
               return Card(
                 color: cardColor,

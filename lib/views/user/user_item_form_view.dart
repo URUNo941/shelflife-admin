@@ -18,9 +18,12 @@ Future<bool> confirmDeleteItem(BuildContext context, UserItem item) async {
         textAlign: TextAlign.center,
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+        TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel')),
         FilledButton(
-          style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+          style:
+              FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
           onPressed: () => Navigator.pop(ctx, true),
           child: const Text('Delete'),
         ),
@@ -80,28 +83,58 @@ class _UserItemFormViewState extends State<UserItemFormView> {
     if (d != null) setState(() => _expiry = d);
   }
 
-  void _save() {
+  Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     final inv = UserInventory.instance;
-    final item = widget.item;
-    if (item == null) {
-      inv.add(UserItem(
-        id: inv.newId(),
-        barcode: _barcode.text.trim(),
-        name: _name.text.trim(),
-        category: _category,
-        expiry: _expiry,
-        qty: _qty,
-      ));
-    } else {
-      item
-        ..barcode = _barcode.text.trim()
-        ..name = _name.text.trim()
-        ..category = _category
-        ..expiry = _expiry
-        ..qty = _qty;
-      inv.update();
+    final oldItem = widget.item;
+    final candidate = UserItem(
+      id: oldItem?.id ?? inv.newId(),
+      barcode: _barcode.text.trim(),
+      name: _name.text.trim(),
+      category: _category,
+      expiry: _expiry,
+      addedAt: oldItem?.addedAt,
+      qty: _qty,
+    );
+    final matchingBatch = inv.findBatch(
+      barcode: candidate.barcode,
+      expiry: candidate.expiry,
+      excludingId: oldItem?.id,
+    );
+
+    UserItem? mergeInto;
+    if (matchingBatch != null) {
+      final choice = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Matching expiry batch'),
+          content: Text(
+            '${candidate.name} already has a batch with this barcode and expiry date '
+            '(${_fmt(candidate.expiry)}), with ${matchingBatch.qty} in stock.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, 'separate'),
+              child: const Text('Keep separate'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: kUserGreen),
+              onPressed: () => Navigator.pop(context, 'merge'),
+              child: const Text('Add quantity'),
+            ),
+          ],
+        ),
+      );
+      if (choice == null) return;
+      if (!mounted) return;
+      if (choice == 'merge') mergeInto = matchingBatch;
     }
+
+    inv.save(candidate, replacing: oldItem, mergeInto: mergeInto);
     Navigator.pop(context);
   }
 
@@ -141,19 +174,25 @@ class _UserItemFormViewState extends State<UserItemFormView> {
                     onPressed: () {}, // TODO: ต่อกล้องสแกนบาร์โค้ด
                   ),
                 ),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Required' : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _name,
-                decoration: const InputDecoration(labelText: 'Product Name *', border: OutlineInputBorder()),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                decoration: const InputDecoration(
+                    labelText: 'Product Name *', border: OutlineInputBorder()),
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Required' : null,
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 initialValue: _category,
-                decoration: const InputDecoration(labelText: 'Category *', border: OutlineInputBorder()),
-                items: kCategories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                decoration: const InputDecoration(
+                    labelText: 'Category *', border: OutlineInputBorder()),
+                items: kCategories
+                    .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                    .toList(),
                 onChanged: (v) => setState(() => _category = v ?? _category),
               ),
               const SizedBox(height: 16),
@@ -176,7 +215,9 @@ class _UserItemFormViewState extends State<UserItemFormView> {
                   onPressed: _qty > 1 ? () => setState(() => _qty--) : null,
                   icon: const Icon(Icons.remove_circle_outline),
                 ),
-                Text('$_qty', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                Text('$_qty',
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.bold)),
                 IconButton(
                   onPressed: () => setState(() => _qty++),
                   icon: const Icon(Icons.add_circle_outline),
@@ -195,7 +236,8 @@ class _UserItemFormViewState extends State<UserItemFormView> {
                           child: const Text('Delete'),
                         )
                       : OutlinedButton(
-                          style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                          style: OutlinedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(48)),
                           onPressed: () => Navigator.pop(context),
                           child: const Text('Cancel'),
                         ),

@@ -1,3 +1,7 @@
+import 'package:flutter/material.dart';
+
+import '../utils/expiry_status.dart';
+
 class InventoryItemModel {
   final int itemId;
   final int userId;
@@ -6,6 +10,7 @@ class InventoryItemModel {
   final String category;
   final int quantity;
   final DateTime expirationDate;
+  final DateTime createdAt;
   final String status; // 'active', 'consumed', 'discarded'
 
   InventoryItemModel({
@@ -16,6 +21,7 @@ class InventoryItemModel {
     required this.category,
     required this.quantity,
     required this.expirationDate,
+    required this.createdAt,
     required this.status,
   });
 
@@ -28,9 +34,20 @@ class InventoryItemModel {
       category: json['category'] ?? 'General',
       quantity: json['quantity'] ?? 1,
       expirationDate: DateTime.parse(json['expiration_date']),
+      createdAt: DateTime.parse(json['created_at']),
       status: json['status'] ?? 'active',
     );
   }
+
+  double get remainingLifePercentage => ExpiryStatus.remainingPercentage(
+        addedAt: createdAt,
+        expiryDate: expirationDate,
+      );
+
+  Color get expiryColor => ExpiryStatus.color(
+        addedAt: createdAt,
+        expiryDate: expirationDate,
+      );
 
   Map<String, dynamic> toJson() {
     return {

@@ -51,11 +51,15 @@ class UserProfileView extends StatelessWidget {
           child: Icon(Icons.logout, color: Color(0xFFDC2626)),
         ),
         title: const Text('Log out?'),
-        content: const Text('You will need to log in again to see your items.', textAlign: TextAlign.center),
+        content: const Text('You will need to log in again to see your items.',
+            textAlign: TextAlign.center),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626)),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Log out'),
           ),
@@ -75,12 +79,15 @@ class UserProfileView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final initials = account.username.isEmpty ? '?' : account.username.substring(0, 1).toUpperCase();
+    final initials = account.username.isEmpty
+        ? '?'
+        : account.username.substring(0, 1).toUpperCase();
 
     return ListenableBuilder(
       listenable: UserInventory.instance,
       builder: (context, _) {
-        final count = UserInventory.instance.items.length;
+        final count = UserInventory.instance.items
+            .fold<int>(0, (total, item) => total + item.qty);
         return SingleChildScrollView(
           padding: const EdgeInsets.all(20),
           child: Column(
@@ -89,11 +96,17 @@ class UserProfileView extends StatelessWidget {
                 radius: 40,
                 backgroundColor: const Color(0xFFDCFCE7),
                 child: Text(initials,
-                    style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: kUserGreen)),
+                    style: const TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: kUserGreen)),
               ),
               const SizedBox(height: 12),
-              Text(account.username, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-              Text(account.email, style: TextStyle(color: Colors.grey.shade600)),
+              Text(account.username,
+                  style: const TextStyle(
+                      fontSize: 22, fontWeight: FontWeight.bold)),
+              Text(account.email,
+                  style: TextStyle(color: Colors.grey.shade600)),
               const SizedBox(height: 24),
               Container(
                 decoration: BoxDecoration(
@@ -110,7 +123,8 @@ class UserProfileView extends StatelessWidget {
                   const Divider(height: 1),
                   _row(Icons.calendar_today_outlined, 'Joined', account.joined),
                   const Divider(height: 1),
-                  _row(Icons.inventory_2_outlined, 'Items on my shelf', '$count'),
+                  _row(Icons.inventory_2_outlined, 'Items on my shelf',
+                      '$count'),
                 ]),
               ),
               const SizedBox(height: 24),
@@ -134,8 +148,13 @@ class UserProfileView extends StatelessWidget {
   Widget _row(IconData icon, String label, String value) {
     return ListTile(
       leading: Icon(icon, color: kUserGreen),
-      title: Text(label, style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
-      subtitle: Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black87)),
+      title: Text(label,
+          style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+      subtitle: Text(value,
+          style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87)),
     );
   }
 }

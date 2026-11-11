@@ -195,7 +195,7 @@ class _SystemAnalyticsViewState extends State<SystemAnalyticsView> {
                         ),
                         const SizedBox(height: 16),
                         _buildLegendItem(
-                          color: const Color(0xFF0EA5E9),
+                          color: const Color(0xFFF59E0B),
                           label: 'Consumed',
                           value:
                               '$consumedItems (${(consumedItems * 100 / totalItems).round()}%)',
@@ -339,7 +339,7 @@ class DonutChartPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
 
     final paintConsumed = Paint()
-      ..color = const Color(0xFF0EA5E9)
+      ..color = const Color(0xFFF59E0B)
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;

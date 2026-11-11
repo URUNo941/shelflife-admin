@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/expiry_status.dart';
 
 const kUserGreen = Color(0xFF0D7A53);
 const kCategories = ['Food', 'Medicine', 'Other'];
@@ -15,6 +16,7 @@ class UserItem {
   String name;
   String category;
   DateTime expiry;
+  final DateTime addedAt;
   int qty;
 
   UserItem({
@@ -23,8 +25,9 @@ class UserItem {
     required this.name,
     required this.category,
     required this.expiry,
+    DateTime? addedAt,
     this.qty = 1,
-  });
+  }) : addedAt = addedAt ?? DateTime.now();
 
   int get daysLeft {
     final n = DateTime.now();
@@ -32,19 +35,25 @@ class UserItem {
   }
 
   bool get isExpired => daysLeft < 0;
-  bool get isExpiringSoon => daysLeft >= 0 && daysLeft <= 7;
+  double get remainingLifePercentage => ExpiryStatus.remainingPercentage(
+        addedAt: addedAt,
+        expiryDate: expiry,
+      );
+  bool get isCritical =>
+      daysLeft <= 0 || (daysLeft > 1 && remainingLifePercentage < 10);
+  bool get isExpiringSoon =>
+      daysLeft >= 0 &&
+      (daysLeft == 1 ||
+          (remainingLifePercentage >= 10 && remainingLifePercentage < 30));
 
-  Color get statusColor => isExpired
-      ? const Color(0xFFDC2626)
-      : isExpiringSoon
-          ? const Color(0xFFD97706)
-          : kUserGreen;
+  Color get statusColor =>
+      ExpiryStatus.color(addedAt: addedAt, expiryDate: expiry);
 
   String get statusText => isExpired
       ? 'Expired ${-daysLeft}d ago'
       : daysLeft == 0
           ? 'Expires today'
-          : '$daysLeft days left';
+          : '$daysLeft day${daysLeft == 1 ? '' : 's'} left';
 }
 
 /// ที่เก็บข้อมูลชั่วคราวในหน่วยความจำ (mock)
@@ -54,18 +63,71 @@ class UserInventory extends ChangeNotifier {
   static final UserInventory instance = UserInventory._();
 
   final List<UserItem> items = [
-    UserItem(id: 'u1', barcode: '8850123456789', name: 'Fresh Milk', category: 'Food', expiry: _day(2)),
-    UserItem(id: 'u2', barcode: '8850987654321', name: 'Sliced Bread', category: 'Food', expiry: _day(5)),
-    UserItem(id: 'u3', barcode: '8850111222333', name: 'Paracetamol 500mg', category: 'Medicine', expiry: _day(120)),
-    UserItem(id: 'u4', barcode: '8850444555666', name: 'Instant Noodles', category: 'Food', expiry: _day(-3)),
-    UserItem(id: 'u5', barcode: '8850777888999', name: 'Eggs', category: 'Food', expiry: _day(14)),
+    UserItem(
+        id: 'u1',
+        barcode: '8850123456789',
+        name: 'Fresh Milk',
+        category: 'Food',
+        expiry: _day(2)),
+    UserItem(
+        id: 'u2',
+        barcode: '8850987654321',
+        name: 'Sliced Bread',
+        category: 'Food',
+        expiry: _day(5)),
+    UserItem(
+        id: 'u3',
+        barcode: '8850111222333',
+        name: 'Paracetamol 500mg',
+        category: 'Medicine',
+        expiry: _day(120)),
+    UserItem(
+        id: 'u4',
+        barcode: '8850444555666',
+        name: 'Instant Noodles',
+        category: 'Food',
+        expiry: _day(-3)),
+    UserItem(
+        id: 'u5',
+        barcode: '8850777888999',
+        name: 'Eggs',
+        category: 'Food',
+        expiry: _day(14)),
   ];
 
   int _seq = 100;
   String newId() => 'u${_seq++}';
 
-  void add(UserItem item) {
-    items.add(item);
+  UserItem? findBatch({
+    required String barcode,
+    required DateTime expiry,
+    String? excludingId,
+  }) {
+    final normalizedBarcode = barcode.trim().toLowerCase();
+    for (final item in items) {
+      final itemExpiry =
+          DateTime(item.expiry.year, item.expiry.month, item.expiry.day);
+      if (item.id != excludingId &&
+          item.barcode.trim().toLowerCase() == normalizedBarcode &&
+          itemExpiry == DateTime(expiry.year, expiry.month, expiry.day)) {
+        return item;
+      }
+    }
+    return null;
+  }
+
+  void save(UserItem item, {UserItem? replacing, UserItem? mergeInto}) {
+    if (mergeInto != null) {
+      mergeInto.qty += item.qty;
+      if (replacing != null) {
+        items.removeWhere((existing) => existing.id == replacing.id);
+      }
+    } else if (replacing == null) {
+      items.add(item);
+    } else {
+      final index = items.indexWhere((existing) => existing.id == replacing.id);
+      if (index >= 0) items[index] = item;
+    }
     notifyListeners();
   }
 

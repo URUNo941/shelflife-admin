@@ -87,7 +87,8 @@ class _LoginViewState extends State<LoginView> {
                             color: primaryGreen.withOpacity(0.1),
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(Icons.store, size: 48, color: primaryGreen),
+                          child:
+                              Icon(Icons.store, size: 48, color: primaryGreen),
                         ),
                         const SizedBox(height: 16),
                         const Text(
@@ -101,7 +102,8 @@ class _LoginViewState extends State<LoginView> {
                         const SizedBox(height: 6),
                         Text(
                           'Sign in to access your dashboard',
-                          style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                          style:
+                              TextStyle(fontSize: 13, color: Colors.grey[600]),
                         ),
                       ],
                     ),
@@ -151,7 +153,9 @@ class _LoginViewState extends State<LoginView> {
                       prefixIcon: const Icon(Icons.lock_outline, size: 20),
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                          _obscurePassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
                           size: 20,
                           color: Colors.grey,
                         ),
@@ -181,8 +185,10 @@ class _LoginViewState extends State<LoginView> {
                     },
                   ),
                   const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    runSpacing: 4,
                     children: [
                       Row(
                         children: [
@@ -200,14 +206,18 @@ class _LoginViewState extends State<LoginView> {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          const Text('Remember me', style: TextStyle(fontSize: 13)),
+                          const Text('Remember me',
+                              style: TextStyle(fontSize: 13)),
                         ],
                       ),
                       TextButton(
                         onPressed: () {},
                         child: Text(
                           'Forgot password?',
-                          style: TextStyle(color: primaryGreen, fontSize: 13, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                              color: primaryGreen,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold),
                         ),
                       ),
                     ],
@@ -228,23 +238,30 @@ class _LoginViewState extends State<LoginView> {
                       onPressed: _handleLogin,
                       child: const Text(
                         'Sign In',
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
                   const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      const Text("Don't have an account?", style: TextStyle(fontSize: 13)),
+                      const Text("Don't have an account?",
+                          style: TextStyle(fontSize: 13)),
                       TextButton(
                         onPressed: () => Navigator.push(
                           context,
-                          MaterialPageRoute<void>(builder: (_) => const RegisterView()),
+                          MaterialPageRoute<void>(
+                              builder: (_) => const RegisterView()),
                         ),
                         child: Text(
                           'Sign Up',
-                          style: TextStyle(color: primaryGreen, fontSize: 13, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                              color: primaryGreen,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold),
                         ),
                       ),
                     ],
