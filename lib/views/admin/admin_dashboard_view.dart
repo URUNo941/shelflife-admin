@@ -1,6 +1,4 @@
-// เปลื่ยนเป็นหน้า user
-//
-//
+
 import 'package:flutter/material.dart';
 import '../user/login_view.dart' show LoginView;
 
@@ -106,49 +104,6 @@ class AdminDashboardView extends StatelessWidget {
                               onPressed: () => Navigator.pop(context),
                               child: const Text('Close'),
                             ),
-                            FilledButton.icon(
-                              onPressed: () async {
-                                final shouldLogout =
-                                    await showDialog<bool>(
-                                  context: context,
-                                  builder: (context) => AlertDialog(
-                                    title: const Text('Log out?'),
-                                    content: const Text(
-                                      'Are you sure you want to log out?',
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () =>
-                                            Navigator.pop(context, false),
-                                        child: const Text('Cancel'),
-                                      ),
-                                      FilledButton(
-                                        onPressed: () =>
-                                            Navigator.pop(context, true),
-                                        child: const Text('Log out'),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                                if (shouldLogout != true || !context.mounted) {
-                                  return;
-                                }
-                                Navigator.of(context)
-                                  ..pop()
-                                  ..pushAndRemoveUntil(
-                                    MaterialPageRoute<void>(
-                                      builder: (_) => const LoginView(),
-                                    ),
-                                    (route) => false,
-                                  );
-                              },
-                              icon: const Icon(Icons.logout),
-                              label: const Text('Log out'),
-                              style: FilledButton.styleFrom(
-                                backgroundColor: Colors.red,
-                                foregroundColor: Colors.white,
-                              ),
-                            ),
                           ],
                         ),
                       );
@@ -178,6 +133,48 @@ class AdminDashboardView extends StatelessWidget {
                               TextButton(
                                 onPressed: () => Navigator.pop(context),
                                 child: const Text('Close'),
+                              ),
+                              FilledButton.icon(
+                                onPressed: () async {
+                                  final shouldLogout =
+                                      await showDialog<bool>(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
+                                      title: const Text('Log out?'),
+                                      content: const Text(
+                                        'Are you sure you want to log out?',
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context, false),
+                                          child: const Text('Cancel'),
+                                        ),
+                                        FilledButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context, true),
+                                          child: const Text('Log out'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  if (shouldLogout != true ||
+                                      !context.mounted) {
+                                    return;
+                                  }
+                                  Navigator.of(context).pushAndRemoveUntil(
+                                    MaterialPageRoute<void>(
+                                      builder: (_) => const LoginView(),
+                                    ),
+                                    (route) => false,
+                                  );
+                                },
+                                icon: const Icon(Icons.logout),
+                                label: const Text('Log out'),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                  foregroundColor: Colors.white,
+                                ),
                               ),
                             ],
                           ),
