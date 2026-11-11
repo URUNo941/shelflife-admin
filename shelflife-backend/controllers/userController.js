@@ -34,8 +34,8 @@ async function getUser(req, res) {
 }
 
 async function createUser(req, res) {
-  // const validationError = validateUser(req.body);
-  // if (validationError) return res.status(400).json({ message: validationError });
+  const validationError = validateUser(req.body);
+  if (validationError) return res.status(400).json({ message: validationError });
   try {
     const passwordHash = await argon2.hash(req.body.password);
     const result = await query(
