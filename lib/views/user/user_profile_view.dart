@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'login_view.dart';
 import 'user_data.dart';
 
 /// ข้อมูลบัญชีผู้ใช้ (mock) ตอนต่อ API ให้แปลงข้อมูลที่ได้หลัง login เป็น class นี้
@@ -65,7 +66,10 @@ class UserProfileView extends StatelessWidget {
     if (onLogout != null) {
       onLogout!();
     } else {
-      Navigator.of(context).popUntil((route) => route.isFirst);
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute<void>(builder: (_) => const LoginView()),
+        (route) => false,
+      );
     }
   }
 

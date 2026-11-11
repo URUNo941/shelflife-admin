@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:myapp/views/user/user_main_view.dart';
+import 'package:myapp/views/user/login_view.dart';
 
 
 void main() {
@@ -18,7 +18,7 @@ class MyApp extends StatelessWidget {
         primaryColor: const Color(0xFF0D7A53),
         useMaterial3: true,
       ),
-      home: const UserMainView(), // 2. เปลี่ยนตรงนี้เป็น AdminMainView() หรือ UserMainView()
+      home: const LoginView(),
     );
   }
 }

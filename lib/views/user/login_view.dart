@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../admin/master_catalog_view.dart';
+import '../admin/admin_main_view.dart';
+import 'user_main_view.dart';
 
 class LoginView extends StatefulWidget {
   const LoginView({super.key});
@@ -19,12 +20,34 @@ class _LoginViewState extends State<LoginView> {
   bool _rememberMe = false;
 
   void _handleLogin() {
-    if (_formKey.currentState!.validate()) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const MasterCatalogView()),
+    if (!_formKey.currentState!.validate()) return;
+
+    final username = _emailController.text.trim().toLowerCase();
+    final password = _passwordController.text;
+    final Widget? destination = switch ((username, password)) {
+      ('admin', '1234') => const AdminMainView(),
+      ('user', '1234') => const UserMainView(),
+      _ => null,
+    };
+
+    if (destination == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid username or password')),
       );
+      return;
     }
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute<void>(builder: (_) => destination),
+    );
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
   }
 
   @override
@@ -84,16 +107,16 @@ class _LoginViewState extends State<LoginView> {
                   ),
                   const SizedBox(height: 32),
                   const Text(
-                    'Email Address',
+                    'Username',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                   ),
                   const SizedBox(height: 6),
                   TextFormField(
                     controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
+                    keyboardType: TextInputType.text,
                     decoration: InputDecoration(
-                      hintText: 'user@shelflife.com',
-                      prefixIcon: const Icon(Icons.email_outlined, size: 20),
+                      hintText: 'username',
+                      prefixIcon: const Icon(Icons.person_outline, size: 20),
                       filled: true,
                       fillColor: const Color(0xFFF8F9FA),
                       contentPadding: const EdgeInsets.symmetric(vertical: 14),
@@ -108,7 +131,7 @@ class _LoginViewState extends State<LoginView> {
                     ),
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
-                        return 'Please enter your email address';
+                        return 'Please enter your username';
                       }
                       return null;
                     },
