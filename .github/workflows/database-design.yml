@@ -1,9 +1,9 @@
-name: Database design only
+name: Database and API (V2)
 on:
   push:
-    paths: ['shelflife-backend/database/simple-v2/**', '.github/workflows/database-design.yml']
+    paths: ['shelflife-backend/database/**', 'shelflife-backend/controllers/**', 'shelflife-backend/routes/**', 'shelflife-backend/utils/**', 'shelflife-backend/test/**', 'shelflife-backend/db_config.js', 'shelflife-backend/server.js', '.github/workflows/database-design.yml']
   pull_request:
-    paths: ['shelflife-backend/database/simple-v2/**', '.github/workflows/database-design.yml']
+    paths: ['shelflife-backend/database/**', 'shelflife-backend/controllers/**', 'shelflife-backend/routes/**', 'shelflife-backend/utils/**', 'shelflife-backend/test/**', 'shelflife-backend/db_config.js', 'shelflife-backend/server.js', '.github/workflows/database-design.yml']
 jobs:
   database:
     runs-on: ubuntu-latest
@@ -26,7 +26,7 @@ jobs:
           node-version: '22'
       - run: npm ci
         working-directory: shelflife-backend
-      - run: node --test database/simple-v2/database.test.js
+      - run: npm test
         working-directory: shelflife-backend
         env:
           TEST_DB_HOST: 127.0.0.1

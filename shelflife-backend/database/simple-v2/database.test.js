@@ -88,6 +88,18 @@ test("invalid values and category case collisions require review", () => {
   });
   assert.equal(p.report.errors.length, 3);
 });
+test("install file shelflife_v2_db.sql contains schema.sql unchanged", () => {
+  const schema = fs.readFileSync(path.join(__dirname, "schema.sql"), "utf8").trim();
+  const install = fs.readFileSync(
+    path.join(__dirname, "../shelflife_v2_db.sql"),
+    "utf8",
+  );
+  assert.ok(
+    install.includes(schema),
+    "Regenerate shelflife_v2_db.sql after changing schema.sql",
+  );
+  assert.doesNotMatch(install, /\b(DROP|TRUNCATE)\s+(TABLE|DATABASE)\b/i);
+});
 test("consumed/discarded batches need a status change time", () => {
   const p = planCopy({
     users: [user],

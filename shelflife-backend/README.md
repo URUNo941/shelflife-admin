@@ -1,5 +1,34 @@
 # ShelfLife API
 
+## ติดตั้งฐานข้อมูล (V2, 4 ตาราง)
+
+1. เปิด XAMPP → Start **MySQL** → เปิด phpMyAdmin
+2. แท็บ **Import** → เลือกไฟล์ `database/shelflife_v2_db.sql` → กด **Go**
+   จะได้ฐานข้อมูลใหม่ `shelflife_v2_db` พร้อมข้อมูลตัวอย่าง (ฐานข้อมูลเก่า `shelflife_db` ไม่ถูกแก้)
+3. รัน `node server.js` ตามปกติ API จะต่อกับ `shelflife_v2_db` ให้เอง
+   (ถ้าต้องการใช้ชื่ออื่น ตั้ง `DB_NAME=...` ใน `.env`)
+
+ถ้าอยากย้ายข้อมูลของตัวเองจาก `shelflife_db` เดิม ให้ใช้ `database/simple-v2/copy-to-test.js`
+แทนข้อ 2 (ดู `database/simple-v2/README.md`) โดยตั้งชื่อปลายทางเป็น `shelflife_v2_db`
+
+| ตาราง | เก็บอะไร |
+|---|---|
+| `users` | บัญชีผู้ใช้ |
+| `categories` | ชื่อหมวดหมู่ (เก็บครั้งเดียว) |
+| `products` | สินค้า: บาร์โค้ด ชื่อ หมวด (`category_id`) |
+| `inventory_items` | ของในคลังแต่ละล็อต: ใคร (`user_id`) สินค้าอะไร (`product_id`) กี่ชิ้น หมดอายุเมื่อไร |
+
+API ยังส่ง `barcode`, `product_name`, `category` เหมือนเดิม (อ่านผ่าน JOIN) Flutter จึงไม่ต้องแก้
+
+## ทดสอบ
+
+```
+npm test
+```
+
+ถ้าตั้ง `TEST_DB_HOST` (เช่น `127.0.0.1`), `TEST_DB_USER`, `TEST_DB_PASSWORD` จะทดสอบกับ MySQL จริงด้วย
+โดยสร้างฐานข้อมูลชั่วคราวชื่อสุ่มแล้วลบทิ้งเอง ไม่แตะ `shelflife_db` หรือ `shelflife_v2_db`
+
 ## Run
 
 Set `JWT_SECRET` to a long, random secret in the backend process environment, then run `node server.js`. The database connection is configured in `db_config.js`; do not expose this development configuration in production. The API listens on port `3000` unless `PORT` is set.

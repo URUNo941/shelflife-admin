@@ -1,6 +1,10 @@
-const { query, handleDatabaseError, isPositiveId } = require('../utils/db');
+const { query, withTransaction, handleDatabaseError, isPositiveId } = require('../utils/db');
+const { ITEM_SELECT, productIdFor } = require('../utils/catalog');
 
-const itemFields = ['user_id', 'barcode', 'product_name', 'category', 'quantity', 'expiration_date', 'status'];
+// Fields stored on the inventory row itself.
+const itemFields = ['user_id', 'quantity', 'expiration_date', 'status'];
+// Fields that describe the product; they live in products/categories.
+const productFields = ['barcode', 'product_name', 'category'];
 const validStatuses = ['active', 'consumed', 'discarded'];
 
 function validDate(value) {
@@ -31,17 +35,7 @@ function validateItem(body, partial = false) {
   return null;
 }
 
-function itemValues(body) {
-  return [
-    body.user_id,
-    body.barcode || null,
-    body.product_name.trim(),
-    body.category || 'General',
-    body.quantity ?? 1,
-    body.expiration_date,
-    body.status || 'active',
-  ];
-}
+const has = (body, field) => Object.prototype.hasOwnProperty.call(body, field);
 
 async function getInventoryItems(req, res) {
   if (!isPositiveId(req.params.userId)) return res.status(400).json({ message: 'userId must be a positive integer.' });
@@ -49,7 +43,7 @@ async function getInventoryItems(req, res) {
   if (!validStatuses.includes(status)) return res.status(400).json({ message: 'status is invalid.' });
   try {
     const result = await query(
-      'SELECT * FROM inventory_items WHERE user_id = ? AND status = ? ORDER BY expiration_date ASC',
+      `${ITEM_SELECT} WHERE i.user_id = ? AND i.status = ? ORDER BY i.expiration_date ASC`,
       [req.params.userId, status],
     );
     return res.json(result);
@@ -61,7 +55,7 @@ async function getInventoryItems(req, res) {
 async function getInventoryItem(req, res) {
   if (!isPositiveId(req.params.itemId)) return res.status(400).json({ message: 'itemId must be a positive integer.' });
   try {
-    const rows = await query('SELECT * FROM inventory_items WHERE item_id = ?', [req.params.itemId]);
+    const rows = await query(`${ITEM_SELECT} WHERE i.item_id = ?`, [req.params.itemId]);
     if (!rows.length) return res.status(404).json({ message: 'Inventory item not found.' });
     return res.json(rows[0]);
   } catch (error) {
@@ -72,14 +66,20 @@ async function getInventoryItem(req, res) {
 async function createInventoryItem(req, res) {
   const validationError = validateItem(req.body);
   if (validationError) return res.status(400).json({ message: validationError });
+  const body = req.body;
+  const status = body.status || 'active';
   try {
-    const result = await query(
-      `INSERT INTO inventory_items
-       (user_id, barcode, product_name, category, quantity, expiration_date, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      itemValues(req.body),
-    );
-    const rows = await query('SELECT * FROM inventory_items WHERE item_id = ?', [result.insertId]);
+    const itemId = await withTransaction(async (q) => {
+      const productId = await productIdFor(q, { ...body, created_by: body.user_id });
+      const result = await q(
+        `INSERT INTO inventory_items
+         (user_id, product_id, quantity, expiration_date, status, status_updated_at)
+         VALUES (?, ?, ?, ?, ?, IF(? = 'active', NULL, CURRENT_TIMESTAMP))`,
+        [body.user_id, productId, body.quantity ?? 1, body.expiration_date, status, status],
+      );
+      return result.insertId;
+    });
+    const rows = await query(`${ITEM_SELECT} WHERE i.item_id = ?`, [itemId]);
     return res.status(201).json(rows[0]);
   } catch (error) {
     return handleDatabaseError(res, error);
@@ -91,24 +91,41 @@ async function updateInventoryItem(req, res) {
   const validationError = validateItem(req.body, true);
   if (validationError) return res.status(400).json({ message: validationError });
 
-  const updates = [];
-  const values = [];
-  for (const field of itemFields) {
-    if (Object.prototype.hasOwnProperty.call(req.body, field)) {
-      updates.push(`${field} = ?`);
-      values.push(field === 'product_name' ? req.body[field].trim() : req.body[field]);
-      if (field === 'status') updates.push('status_updated_at = CURRENT_TIMESTAMP');
-    }
+  const body = req.body;
+  if (![...itemFields, ...productFields].some((field) => has(body, field))) {
+    return res.status(400).json({ message: 'At least one item field is required.' });
   }
-  if (!updates.length) return res.status(400).json({ message: 'At least one item field is required.' });
 
   try {
-    const result = await query(
-      `UPDATE inventory_items SET ${updates.join(', ')} WHERE item_id = ?`,
-      [...values, req.params.itemId],
-    );
-    if (!result.affectedRows) return res.status(404).json({ message: 'Inventory item not found.' });
-    const rows = await query('SELECT * FROM inventory_items WHERE item_id = ?', [req.params.itemId]);
+    const found = await withTransaction(async (q) => {
+      const current = (await q(`${ITEM_SELECT} WHERE i.item_id = ? FOR UPDATE`, [req.params.itemId]))[0];
+      if (!current) return false;
+
+      const updates = [];
+      const values = [];
+      for (const field of itemFields) {
+        if (has(body, field)) {
+          updates.push(`${field} = ?`);
+          values.push(body[field]);
+          if (field === 'status') updates.push('status_updated_at = CURRENT_TIMESTAMP');
+        }
+      }
+      // Changing name/barcode/category points the batch at the matching product.
+      if (productFields.some((field) => has(body, field))) {
+        const productId = await productIdFor(q, {
+          barcode: has(body, 'barcode') ? body.barcode : current.barcode,
+          product_name: has(body, 'product_name') ? body.product_name : current.product_name,
+          category: has(body, 'category') ? body.category : current.category,
+          created_by: current.user_id,
+        });
+        updates.push('product_id = ?');
+        values.push(productId);
+      }
+      await q(`UPDATE inventory_items SET ${updates.join(', ')} WHERE item_id = ?`, [...values, req.params.itemId]);
+      return true;
+    });
+    if (!found) return res.status(404).json({ message: 'Inventory item not found.' });
+    const rows = await query(`${ITEM_SELECT} WHERE i.item_id = ?`, [req.params.itemId]);
     return res.json(rows[0]);
   } catch (error) {
     return handleDatabaseError(res, error);
