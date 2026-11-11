@@ -203,7 +203,7 @@ async function copyToTest({
   try {
     await source.query("SET time_zone = '+00:00'");
     const [engines] = await source.query(
-      "SELECT table_name,engine FROM information_schema.tables WHERE table_schema=? AND table_name IN ('users','global_products','inventory_items')",
+      "SELECT table_name AS table_name, engine AS engine FROM information_schema.tables WHERE table_schema=? AND table_name IN ('users','global_products','inventory_items')",
       [sourceName],
     );
     if (engines.length !== 3 || engines.some((r) => r.engine !== "InnoDB"))
@@ -241,7 +241,7 @@ async function copyToTest({
     };
     for (const [table, expected] of Object.entries(expectedColumns)) {
       const [columns] = await source.query(
-        "SELECT column_name FROM information_schema.columns WHERE table_schema=? AND table_name=?",
+        "SELECT column_name AS column_name FROM information_schema.columns WHERE table_schema=? AND table_name=?",
         [sourceName, table],
       );
       const actual = columns.map((c) => c.column_name).sort();

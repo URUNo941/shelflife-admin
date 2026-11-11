@@ -203,7 +203,7 @@ test(
           assert.equal(
             (
               await root.query(
-                "SELECT schema_name FROM information_schema.schemata WHERE schema_name=?",
+                "SELECT schema_name AS schema_name FROM information_schema.schemata WHERE schema_name=?",
                 [targetName],
               )
             )[0].length,
@@ -254,7 +254,7 @@ test(
           }
           const tables = (
             await root.query(
-              "SELECT table_name FROM information_schema.tables WHERE table_schema=? ORDER BY table_name",
+              "SELECT table_name AS table_name FROM information_schema.tables WHERE table_schema=? ORDER BY table_name",
               [targetName],
             )
           )[0].map((r) => r.table_name);
