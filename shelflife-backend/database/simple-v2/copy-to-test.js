@@ -68,6 +68,8 @@ function planCopy(source) {
       errors.push(`Invalid quantity at item ${item.item_id}.`);
     if (!["active", "consumed", "discarded"].includes(item.status))
       errors.push(`Invalid status at item ${item.item_id}.`);
+    else if (item.status !== "active" && item.status_updated_at == null)
+      errors.push(`Missing status change time at item ${item.item_id}.`);
     const date = item.expiration_date;
     if (
       typeof date !== "string" ||
@@ -130,6 +132,20 @@ function planCopy(source) {
     if (names.has(key))
       errors.push(`Review differently spelled category: ${c.category_name}`);
     names.add(key);
+  }
+  // Unbarcoded products must be unique by name within a category in V2.
+  const unbarcoded = new Set();
+  for (const p of products) {
+    if (p.barcode !== null || typeof p.product_name !== "string") continue;
+    const key = JSON.stringify([
+      p.product_name.trim().toLowerCase(),
+      p.category_id,
+    ]);
+    if (unbarcoded.has(key))
+      errors.push(
+        `Review differently spelled unbarcoded product at product ${p.product_id}.`,
+      );
+    unbarcoded.add(key);
   }
   return {
     users: source.users.map((u) => ({ ...u, email: u.email ?? null })),

@@ -88,6 +88,31 @@ test("invalid values and category case collisions require review", () => {
   });
   assert.equal(p.report.errors.length, 3);
 });
+test("consumed/discarded batches need a status change time", () => {
+  const p = planCopy({
+    users: [user],
+    products: [],
+    items: [
+      item(1, { status: "consumed" }),
+      item(2, { status: "discarded", status_updated_at: timestamp }),
+      item(3, { status_updated_at: timestamp }),
+    ],
+  });
+  assert.equal(p.report.errors.length, 1);
+  assert.match(p.report.errors[0], /item 1\b/);
+});
+test("unbarcoded products differing only by case require review", () => {
+  const p = planCopy({
+    users: [user],
+    products: [],
+    items: [
+      item(1, { barcode: null, product_name: "Milk" }),
+      item(2, { barcode: null, product_name: "milk " }),
+    ],
+  });
+  assert.equal(p.report.errors.length, 1);
+  assert.match(p.report.errors[0], /unbarcoded/);
+});
 
 test(
   "V1 source stays intact; normalized test copy enforces relationships",
@@ -272,9 +297,6 @@ test(
             ),
           );
           await assert.rejects(
-            root.query(`DELETE FROM \`${targetName}\`.users WHERE user_id=1`),
-          );
-          await assert.rejects(
             root.query(
               `UPDATE \`${targetName}\`.inventory_items SET product_id=999999 WHERE item_id=1`,
             ),
@@ -289,6 +311,58 @@ test(
               `INSERT INTO \`${targetName}\`.categories(category_name) VALUES ('Food')`,
             ),
           );
+          // A finished batch must say when it finished.
+          await assert.rejects(
+            root.query(
+              `UPDATE \`${targetName}\`.inventory_items SET status='consumed', status_updated_at=NULL WHERE item_id=1`,
+            ),
+          );
+          await root.query(
+            `UPDATE \`${targetName}\`.inventory_items SET status='consumed', status_updated_at=CURRENT_TIMESTAMP WHERE item_id=1`,
+          );
+        },
+      );
+      await t.test(
+        "unbarcoded names are unique per category; barcoded names may repeat",
+        async () => {
+          const db = `\`${targetName}\``;
+          await root.query(
+            `INSERT INTO ${db}.products(barcode,product_name,category_id) VALUES ('B-1','Same name',1),('B-2','Same name',1)`,
+          );
+          await root.query(
+            `INSERT INTO ${db}.products(barcode,product_name,category_id) VALUES (NULL,'Loose bananas',1)`,
+          );
+          await assert.rejects(
+            root.query(
+              `INSERT INTO ${db}.products(barcode,product_name,category_id) VALUES (NULL,'Loose bananas',1)`,
+            ),
+            (e) => e.code === "ER_DUP_ENTRY",
+          );
+          await root.query(
+            `INSERT INTO ${db}.products(barcode,product_name,category_id) VALUES (NULL,'Loose bananas',2)`,
+          );
+        },
+      );
+      await t.test(
+        "deleting a user removes only their batches and keeps products",
+        async () => {
+          const db = `\`${targetName}\``;
+          const [[{ n: productsBefore }]] = await root.query(
+            `SELECT COUNT(*) n FROM ${db}.products`,
+          );
+          await root.query(`DELETE FROM ${db}.users WHERE user_id=1`);
+          const [[{ n: items }]] = await root.query(
+            `SELECT COUNT(*) n FROM ${db}.inventory_items WHERE user_id=1`,
+          );
+          assert.equal(items, 0);
+          const [[{ n: productsAfter }]] = await root.query(
+            `SELECT COUNT(*) n FROM ${db}.products`,
+          );
+          assert.equal(productsAfter, productsBefore);
+          const [[{ n: orphanCreators }]] = await root.query(
+            `SELECT COUNT(*) n FROM ${db}.products WHERE created_by=1`,
+          );
+          assert.equal(orphanCreators, 0);
         },
       );
       await t.test(

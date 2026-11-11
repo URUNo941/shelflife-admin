@@ -28,8 +28,13 @@ CREATE TABLE products (
   category_id INT NOT NULL,
   created_by INT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  -- Filled automatically: the name only when the product has no barcode, else NULL.
+  -- Lets products with different barcodes share a name, but blocks duplicate
+  -- unbarcoded products with the same name in the same category.
+  unbarcoded_name VARCHAR(100) AS (IF(barcode IS NULL, product_name, NULL)) STORED,
   PRIMARY KEY (product_id),
   UNIQUE KEY uq_product_barcode (barcode),
+  UNIQUE KEY uq_unbarcoded_name_category (unbarcoded_name, category_id),
   CONSTRAINT fk_product_category FOREIGN KEY (category_id)
     REFERENCES categories (category_id) ON DELETE RESTRICT,
   CONSTRAINT fk_product_creator FOREIGN KEY (created_by)
@@ -49,8 +54,11 @@ CREATE TABLE inventory_items (
   PRIMARY KEY (item_id),
   KEY idx_inventory_owner_status_expiry (user_id, status, expiration_date),
   CONSTRAINT chk_inventory_quantity CHECK (quantity > 0),
+  -- A consumed/discarded batch must record when its status changed.
+  CONSTRAINT chk_inventory_status_time CHECK (status = 'active' OR status_updated_at IS NOT NULL),
+  -- Deleting an account also deletes that user's own batches (same as V1).
   CONSTRAINT fk_inventory_user FOREIGN KEY (user_id)
-    REFERENCES users (user_id) ON DELETE RESTRICT,
+    REFERENCES users (user_id) ON DELETE CASCADE,
   CONSTRAINT fk_inventory_product FOREIGN KEY (product_id)
     REFERENCES products (product_id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

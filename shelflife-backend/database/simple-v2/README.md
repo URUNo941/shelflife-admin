@@ -47,15 +47,22 @@ erDiagram
 |---|---|
 | users | `user_id` INT PK, `username` VARCHAR(50) UNIQUE, `email` VARCHAR(254) NULL UNIQUE, `password_hash` VARCHAR(255), `role` ENUM(user,admin), `created_at`/`updated_at` TIMESTAMP |
 | categories | `category_id` INT PK, `category_name` VARCHAR(50) UNIQUE |
-| products | `product_id` INT PK, `barcode` VARCHAR(50) NULL UNIQUE, `product_name` VARCHAR(100), `category_id` FK, `created_by` NULL FK, `created_at` TIMESTAMP |
+| products | `product_id` INT PK, `barcode` VARCHAR(50) NULL UNIQUE, `product_name` VARCHAR(100), `category_id` FK, `created_by` NULL FK, `created_at` TIMESTAMP, `unbarcoded_name` (อัตโนมัติ) |
 | inventory_items | `item_id` INT PK, `user_id` FK, `product_id` FK, `quantity` INT CHECK > 0, `expiration_date` DATE, `status` ENUM(active,consumed,discarded), `status_updated_at` NULL TIMESTAMP, `created_at`/`updated_at` TIMESTAMP |
 
 - `email` เป็น NULL สำหรับบัญชีเดิม ไม่สร้างอีเมลปลอมหรือแก้รหัสผ่าน
-- สินค้าไม่มีบาร์โค้ดได้ โดยใช้ `product_id` เป็นตัวอ้างอิง; ชื่อสินค้าไม่ต้อง UNIQUE
-  เพราะสินค้าคนละตัวอาจชื่อเหมือนกัน
+- สินค้าไม่มีบาร์โค้ดได้ โดยใช้ `product_id` เป็นตัวอ้างอิง
+- สินค้าที่**มี**บาร์โค้ดต่างกันใช้ชื่อซ้ำกันได้ เพราะคนละยี่ห้ออาจชื่อเหมือนกัน แต่สินค้าที่
+  **ไม่มี**บาร์โค้ดห้ามชื่อซ้ำในหมวดเดียวกัน กันด้วยคอลัมน์อัตโนมัติ `unbarcoded_name`
+  (ค่าเท่ากับชื่อเมื่อไม่มีบาร์โค้ด, NULL เมื่อมี) + `UNIQUE (unbarcoded_name, category_id)`
+  ไม่ต้องใส่ค่าคอลัมน์นี้เอง
 - ถ้าสินค้าจากคลังไม่มีในรายการสินค้ากลาง จะสร้างข้อมูลสินค้าในฐานข้อมูลใหม่ให้
 - หมวดหมู่จะสร้างจากข้อมูลจริง ไม่สร้างรายการตัวอย่างเพิ่มเติม
-- ลบผู้ใช้/สินค้าที่มีคลังอ้างอิงอยู่ไม่ได้ (`RESTRICT`) เพื่อไม่ให้ลบข้อมูลคลังตามไปด้วย
+- ลบผู้ใช้ได้ (`ON DELETE CASCADE`): ล็อตในคลังของผู้ใช้คนนั้นจะถูกลบตาม (เหมือน V1
+  และรองรับ API ลบผู้ใช้) ส่วนสินค้าที่เขาเคยเพิ่มยังอยู่ โดย `created_by` เป็น NULL
+- ลบสินค้าที่ยังมีล็อตในคลังอ้างอิงไม่ได้ (`RESTRICT`) เพื่อไม่ให้คลังของคนอื่นหายตาม
+- ล็อตที่สถานะเป็น `consumed`/`discarded` ต้องมี `status_updated_at` เสมอ
+  (`chk_inventory_status_time`) ส่วน `active` จะมีหรือไม่มีก็ได้ เผื่อกรณีเปลี่ยนกลับเป็น active
 - วันหมดอายุอยู่ที่ล็อตในคลังเท่านั้น “หมดอายุแล้ว” คำนวณจากวันที่ ไม่เก็บเป็นสถานะซ้ำ
 - Index `(user_id,status,expiration_date)` รองรับการค้นคลังตามเจ้าของและวันหมดอายุ
 
