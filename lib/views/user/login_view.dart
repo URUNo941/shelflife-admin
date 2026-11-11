@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../admin/admin_main_view.dart';
 import 'user_main_view.dart';
+import 'package:myapp/views/register_view.dart';
 
 class LoginView extends StatefulWidget {
   const LoginView({super.key});
@@ -230,6 +231,23 @@ class _LoginViewState extends State<LoginView> {
                         style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                       ),
                     ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text("Don't have an account?", style: TextStyle(fontSize: 13)),
+                      TextButton(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute<void>(builder: (_) => const RegisterView()),
+                        ),
+                        child: Text(
+                          'Sign Up',
+                          style: TextStyle(color: primaryGreen, fontSize: 13, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
