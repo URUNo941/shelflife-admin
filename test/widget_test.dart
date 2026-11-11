@@ -4,8 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
-import '../lib/models/inventory_item_model.dart';
-import '../lib/views/user/inventory_list_view.dart';
+import 'package:myapp/models/inventory_item_model.dart';
+import 'package:myapp/views/user/inventory_list_view.dart';
 
 // ย้ายฟังก์ชันคำนวณสีออกมาทดสอบต่างหาก
 String getExpiryStatus(DateTime expDate) {
@@ -57,7 +57,8 @@ void main() {
       final json = item.toJson();
 
       expect(json['product_name'], equals('Paracetamol'));
-      expect(json['expiration_date'].toString().startsWith('2026-11-10'), isTrue);
+      expect(
+          json['expiration_date'].toString().startsWith('2026-11-10'), isTrue);
       expect(json['quantity'], equals(5));
     });
   });
@@ -80,7 +81,8 @@ void main() {
   });
 
   group('3. HTTP API Mock Tests', () {
-    test('Mock getInventoryItems returns a list of items on success (200 OK)', () async {
+    test('Mock getInventoryItems returns a list of items on success (200 OK)',
+        () async {
       // สร้าง MockClient เพื่อจำลองการตอบกลับของเซิร์ฟเวอร์
       final mockClient = MockClient((request) async {
         final mockResponse = [
@@ -98,9 +100,11 @@ void main() {
       });
 
       // ทดสอบการยิง API และแปลงข้อมูล
-      final response = await mockClient.get(Uri.parse('http://localhost:3000/api/items/1'));
+      final response =
+          await mockClient.get(Uri.parse('http://localhost:3000/api/items/1'));
       final List data = jsonDecode(response.body);
-      final items = data.map((json) => InventoryItemModel.fromJson(json)).toList();
+      final items =
+          data.map((json) => InventoryItemModel.fromJson(json)).toList();
 
       expect(items, isA<List<InventoryItemModel>>());
       expect(items.length, 1);
@@ -112,13 +116,15 @@ void main() {
         return http.Response('Internal Server Error', 500);
       });
 
-      final response = await mockClient.get(Uri.parse('http://localhost:3000/api/items/1'));
+      final response =
+          await mockClient.get(Uri.parse('http://localhost:3000/api/items/1'));
       expect(response.statusCode, 500);
     });
   });
 
   group('4. InventoryListView UI Tests', () {
-    testWidgets('Displays AppBar and Loading Indicator initially', (WidgetTester tester) async {
+    testWidgets('Displays AppBar and Loading Indicator initially',
+        (WidgetTester tester) async {
       await tester.pumpWidget(
         const MaterialApp(
           home: InventoryListView(),
@@ -132,7 +138,8 @@ void main() {
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
     });
 
-    testWidgets('AppBar has Teal background color', (WidgetTester tester) async {
+    testWidgets('AppBar has Teal background color',
+        (WidgetTester tester) async {
       await tester.pumpWidget(
         const MaterialApp(
           home: InventoryListView(),
@@ -142,27 +149,6 @@ void main() {
       // ดึง Widget AppBar ออกมาตรวจสอบสี
       final appBar = tester.widget<AppBar>(find.byType(AppBar));
       expect(appBar.backgroundColor, Colors.teal);
-    });
-  });
-
-  group('5. Authentication Mock Logic Tests', () {
-    String checkRole(String email, String password) {
-      if (email == 'admin@shelflife.com' && password == 'admin1234') {
-        return 'admin';
-      } else if (email.isNotEmpty && password.isNotEmpty) {
-        return 'user';
-      }
-      return 'invalid';
-    }
-
-    test('Admin credentials return admin role', () {
-      final role = checkRole('admin@shelflife.com', 'admin1234');
-      expect(role, equals('admin'));
-    });
-
-    test('Standard user credentials return user role', () {
-      final role = checkRole('user@shelflife.com', 'user1234');
-      expect(role, equals('user'));
     });
   });
 }

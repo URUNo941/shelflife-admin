@@ -1,23 +1,24 @@
-require('dotenv').config();
-
-
-const express = require('express');
-const cors = require('cors');
-const inventoryRoutes = require('./routes/inventoryRoutes');
-const productRoutes = require('./routes/productRoutes');
-const userRoutes = require('./routes/userRoutes');
-const authRoutes = require('./routes/authRoutes');
-
-const app = express();
-app.use(cors());
-app.use(express.json());
-
-app.use('/api/items', inventoryRoutes);
-app.use('/api/products', productRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/auth', authRoutes);
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+require("dotenv").config();
+const app = require("./app");
+const pool = require("./db_config");
+async function start() {
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32)
+    throw new Error("Set JWT_SECRET to at least 32 random characters.");
+  await pool.query("SELECT 1");
+  const server = app.listen(process.env.PORT || 3000, () =>
+    console.log("ShelfLife API ready."),
+  );
+  for (const signal of ["SIGTERM", "SIGINT"])
+    process.on(signal, () =>
+      server.close(async () => {
+        await pool.end();
+        process.exit(0);
+      }),
+    );
+}
+start().catch(() => {
+  console.error(
+    "Startup failed. Check database and authentication configuration.",
+  );
+  process.exit(1);
 });

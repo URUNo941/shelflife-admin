@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 /// หน้าสแกนบาร์โค้ด / QR ด้วยกล้อง
-/// สแกนเจอแล้วจะปิดหน้านี้และส่งค่ากลับ: final code = await Navigator.push<String>(...)
+/// สแกนเจอแล้วจะปิดหน้านี้และส่งค่ากลับ: `final code = await Navigator.push<String>(...)`
 class UserScanView extends StatefulWidget {
   const UserScanView({super.key});
 
@@ -16,7 +16,8 @@ class _UserScanViewState extends State<UserScanView> {
 
   void _onDetect(BarcodeCapture capture) {
     if (_done) return;
-    final code = capture.barcodes.map((b) => b.rawValue).whereType<String>().firstOrNull;
+    final code =
+        capture.barcodes.map((b) => b.rawValue).whereType<String>().firstOrNull;
     if (code == null || code.isEmpty) return;
     _done = true;
     Navigator.pop(context, code);

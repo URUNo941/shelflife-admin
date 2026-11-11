@@ -16,12 +16,20 @@ class _UserInventoryViewState extends State<UserInventoryView> {
   String _cat = 'All';
 
   void _openForm([UserItem? item]) {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => UserItemFormView(item: item)));
+    Navigator.push(context,
+        MaterialPageRoute(builder: (_) => UserItemFormView(item: item)));
   }
 
   Future<void> _delete(UserItem item) async {
     if (await confirmDeleteItem(context, item)) {
-      UserInventory.instance.remove(item.id);
+      try {
+        await UserInventory.instance.remove(item.id);
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text('$e')));
+        }
+      }
     }
   }
 
@@ -40,13 +48,16 @@ class _UserInventoryViewState extends State<UserInventoryView> {
             .toList()
           ..sort((a, b) => a.expiry.compareTo(b.expiry));
 
-        int count(String c) => c == 'All' ? all.length : all.where((i) => i.category == c).length;
+        int count(String c) =>
+            c == 'All' ? all.length : all.where((i) => i.category == c).length;
 
         return ListView(
           padding: const EdgeInsets.all(20),
           children: [
             FilledButton.icon(
-              style: FilledButton.styleFrom(backgroundColor: kUserGreen, minimumSize: const Size.fromHeight(52)),
+              style: FilledButton.styleFrom(
+                  backgroundColor: kUserGreen,
+                  minimumSize: const Size.fromHeight(52)),
               onPressed: () => _openForm(),
               icon: const Icon(Icons.add),
               label: const Text('Add Item'),
@@ -68,7 +79,8 @@ class _UserInventoryViewState extends State<UserInventoryView> {
                         label: Text('$c (${count(c)})'),
                         selected: _cat == c,
                         selectedColor: kUserGreen,
-                        labelStyle: TextStyle(color: _cat == c ? Colors.white : null),
+                        labelStyle:
+                            TextStyle(color: _cat == c ? Colors.white : null),
                         checkmarkColor: Colors.white,
                         onSelected: (_) => setState(() => _cat = c),
                       ))
@@ -99,17 +111,24 @@ class _UserInventoryViewState extends State<UserInventoryView> {
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(
-                      item.category == 'Medicine' ? Icons.medication_outlined : Icons.restaurant_outlined,
+                      item.category == 'Medicine'
+                          ? Icons.medication_outlined
+                          : Icons.restaurant_outlined,
                       color: item.statusColor,
                     ),
                   ),
-                  title: Text('${item.name}  ×${item.qty}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                  title: Text('${item.name}  ×${item.qty}',
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
                   subtitle: Text('${item.barcode} · ${item.category}'),
                   trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                     Text(item.statusText,
-                        style: TextStyle(color: item.statusColor, fontSize: 12, fontWeight: FontWeight.w600)),
+                        style: TextStyle(
+                            color: item.statusColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600)),
                     PopupMenuButton<String>(
-                      onSelected: (v) => v == 'edit' ? _openForm(item) : _delete(item),
+                      onSelected: (v) =>
+                          v == 'edit' ? _openForm(item) : _delete(item),
                       itemBuilder: (_) => const [
                         PopupMenuItem(value: 'edit', child: Text('Edit')),
                         PopupMenuItem(value: 'delete', child: Text('Delete')),

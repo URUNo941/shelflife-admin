@@ -40,7 +40,7 @@ class InventoryItemModel {
       'product_name': productName,
       'category': category,
       'quantity': quantity,
-      'expiration_date': expirationDate.toIso8601String(),
+      'expiration_date': expirationDate.toIso8601String().substring(0, 10),
       'status': status,
     };
   }

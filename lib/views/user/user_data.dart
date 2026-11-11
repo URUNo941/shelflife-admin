@@ -1,12 +1,8 @@
+import '../../services/api_client.dart';
 import 'package:flutter/material.dart';
 
 const kUserGreen = Color(0xFF0D7A53);
 const kCategories = ['Food', 'Medicine', 'Other'];
-
-DateTime _day(int offset) {
-  final t = DateTime.now();
-  return DateTime(t.year, t.month, t.day + offset);
-}
 
 /// สินค้าในตู้ของผู้ใช้ 1 ชิ้น
 class UserItem {
@@ -16,6 +12,7 @@ class UserItem {
   String category;
   DateTime expiry;
   int qty;
+  String status;
 
   UserItem({
     required this.id,
@@ -24,6 +21,7 @@ class UserItem {
     required this.category,
     required this.expiry,
     this.qty = 1,
+    this.status = 'active',
   });
 
   int get daysLeft {
@@ -47,32 +45,65 @@ class UserItem {
           : '$daysLeft days left';
 }
 
-/// ที่เก็บข้อมูลชั่วคราวในหน่วยความจำ (mock)
-/// ตอนต่อ API: เปลี่ยน add/update/remove ให้เรียก API แล้วค่อย notifyListeners()
 class UserInventory extends ChangeNotifier {
   UserInventory._();
-  static final UserInventory instance = UserInventory._();
-
-  final List<UserItem> items = [
-    UserItem(id: 'u1', barcode: '8850123456789', name: 'Fresh Milk', category: 'Food', expiry: _day(2)),
-    UserItem(id: 'u2', barcode: '8850987654321', name: 'Sliced Bread', category: 'Food', expiry: _day(5)),
-    UserItem(id: 'u3', barcode: '8850111222333', name: 'Paracetamol 500mg', category: 'Medicine', expiry: _day(120)),
-    UserItem(id: 'u4', barcode: '8850444555666', name: 'Instant Noodles', category: 'Food', expiry: _day(-3)),
-    UserItem(id: 'u5', barcode: '8850777888999', name: 'Eggs', category: 'Food', expiry: _day(14)),
-  ];
-
-  int _seq = 100;
-  String newId() => 'u${_seq++}';
-
-  void add(UserItem item) {
-    items.add(item);
+  static final instance = UserInventory._();
+  final List<UserItem> items = [];
+  bool loading = false;
+  String? error;
+  int _generation = 0;
+  void clear() {
+    _generation++;
+    items.clear();
+    error = null;
+    loading = false;
     notifyListeners();
   }
 
-  void update() => notifyListeners(); // เรียกหลังแก้ค่าใน UserItem
-
-  void remove(String id) {
-    items.removeWhere((e) => e.id == id);
+  Future<void> refresh() async {
+    final generation = _generation;
+    loading = true;
+    error = null;
     notifyListeners();
+    try {
+      final rows =
+          await ApiClient.instance.request('GET', '/me/inventory') as List;
+      if (generation != _generation) return;
+      items
+        ..clear()
+        ..addAll(rows.map((j) => UserItem(
+            id: '${j['item_id']}',
+            barcode: j['barcode'] ?? '',
+            name: j['product_name'],
+            category: j['category'],
+            expiry: DateTime.parse(j['expiration_date']),
+            status: j['status'],
+            qty: j['quantity'])));
+    } catch (e) {
+      if (generation == _generation) error = '$e';
+    } finally {
+      if (generation == _generation) {
+        loading = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  Future<void> save(UserItem item, {required bool create}) async {
+    await ApiClient.instance.request(create ? 'POST' : 'PATCH',
+        create ? '/me/inventory' : '/me/inventory/${item.id}', {
+      'barcode': item.barcode.isEmpty ? null : item.barcode,
+      'product_name': item.name,
+      'category': item.category,
+      'quantity': item.qty,
+      'status': item.status,
+      'expiration_date': item.expiry.toIso8601String().substring(0, 10),
+    });
+    await refresh();
+  }
+
+  Future<void> remove(String id) async {
+    await ApiClient.instance.request('DELETE', '/me/inventory/$id');
+    await refresh();
   }
 }

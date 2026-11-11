@@ -1,9 +1,10 @@
+import '../../services/api_client.dart';
 import 'package:flutter/material.dart';
 
 import 'login_view.dart';
 import 'user_data.dart';
 
-/// ข้อมูลบัญชีผู้ใช้ (mock) ตอนต่อ API ให้แปลงข้อมูลที่ได้หลัง login เป็น class นี้
+/// Account details from the authenticated API session.
 class UserAccount {
   final String username;
   final String email;
@@ -16,17 +17,20 @@ class UserAccount {
     required this.joined,
   });
 
-  static const mock = UserAccount(
-    username: 'sarah',
-    email: 'sarah@example.com',
-    role: 'User',
-    joined: 'Oct 5, 2026',
-  );
+  static UserAccount get current {
+    final u = ApiClient.instance.user ?? {};
+    return UserAccount(
+        username: u['username'] ?? '',
+        email: u['email'] ?? '',
+        role: u['role'] ?? '',
+        joined: u['created_at']?.toString() ?? '');
+  }
 }
 
 /// หน้าบัญชีของฉัน: แสดงข้อมูลบัญชี + ปุ่ม Log out
 class UserProfileView extends StatelessWidget {
-  final UserAccount account;
+  final UserAccount? _account;
+  UserAccount get account => _account ?? UserAccount.current;
 
   /// เรียกหลังผู้ใช้กดยืนยัน Log out
   /// ถ้าไม่ส่งมา จะย้อนกลับไปหน้าแรกของแอป (มักเป็นหน้า Login)
@@ -37,9 +41,9 @@ class UserProfileView extends StatelessWidget {
 
   const UserProfileView({
     super.key,
-    this.account = UserAccount.mock,
+    UserAccount? account,
     this.onLogout,
-  });
+  }) : _account = account;
 
   Future<void> _confirmLogout(BuildContext context) async {
     final ok = await showDialog<bool>(
@@ -51,11 +55,15 @@ class UserProfileView extends StatelessWidget {
           child: Icon(Icons.logout, color: Color(0xFFDC2626)),
         ),
         title: const Text('Log out?'),
-        content: const Text('You will need to log in again to see your items.', textAlign: TextAlign.center),
+        content: const Text('You will need to log in again to see your items.',
+            textAlign: TextAlign.center),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFDC2626)),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Log out'),
           ),
@@ -63,6 +71,8 @@ class UserProfileView extends StatelessWidget {
       ),
     );
     if (ok != true || !context.mounted) return;
+    ApiClient.instance.logout();
+    UserInventory.instance.clear();
     if (onLogout != null) {
       onLogout!();
     } else {
@@ -75,7 +85,9 @@ class UserProfileView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final initials = account.username.isEmpty ? '?' : account.username.substring(0, 1).toUpperCase();
+    final initials = account.username.isEmpty
+        ? '?'
+        : account.username.substring(0, 1).toUpperCase();
 
     return ListenableBuilder(
       listenable: UserInventory.instance,
@@ -89,11 +101,17 @@ class UserProfileView extends StatelessWidget {
                 radius: 40,
                 backgroundColor: const Color(0xFFDCFCE7),
                 child: Text(initials,
-                    style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: kUserGreen)),
+                    style: const TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: kUserGreen)),
               ),
               const SizedBox(height: 12),
-              Text(account.username, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-              Text(account.email, style: TextStyle(color: Colors.grey.shade600)),
+              Text(account.username,
+                  style: const TextStyle(
+                      fontSize: 22, fontWeight: FontWeight.bold)),
+              Text(account.email,
+                  style: TextStyle(color: Colors.grey.shade600)),
               const SizedBox(height: 24),
               Container(
                 decoration: BoxDecoration(
@@ -110,7 +128,8 @@ class UserProfileView extends StatelessWidget {
                   const Divider(height: 1),
                   _row(Icons.calendar_today_outlined, 'Joined', account.joined),
                   const Divider(height: 1),
-                  _row(Icons.inventory_2_outlined, 'Items on my shelf', '$count'),
+                  _row(Icons.inventory_2_outlined, 'Items on my shelf',
+                      '$count'),
                 ]),
               ),
               const SizedBox(height: 24),
@@ -134,8 +153,13 @@ class UserProfileView extends StatelessWidget {
   Widget _row(IconData icon, String label, String value) {
     return ListTile(
       leading: Icon(icon, color: kUserGreen),
-      title: Text(label, style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
-      subtitle: Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black87)),
+      title: Text(label,
+          style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+      subtitle: Text(value,
+          style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87)),
     );
   }
 }

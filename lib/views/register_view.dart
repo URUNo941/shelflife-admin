@@ -1,11 +1,10 @@
+import '../services/api_client.dart';
 import 'package:flutter/material.dart';
 
-/// หน้าสมัครสมาชิก (Register) ดีไซน์เดียวกับหน้า Login
-///
-/// [onRegister] ใช้ต่อ API ทีหลัง: รับ username, email, password แล้วคืนข้อความ error
-/// (ถ้าสมัครไม่สำเร็จ) หรือ null (ถ้าสำเร็จ) ถ้าไม่ส่งมา จะจำลองว่าสมัครสำเร็จเสมอ
+/// Registration backed by the API; an optional callback supports embedding/tests.
 class RegisterView extends StatefulWidget {
-  final Future<String?> Function(String username, String email, String password)? onRegister;
+  final Future<String?> Function(
+      String username, String email, String password)? onRegister;
 
   const RegisterView({super.key, this.onRegister});
 
@@ -36,17 +35,26 @@ class _RegisterViewState extends State<RegisterView> {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (_loading || !_formKey.currentState!.validate()) return;
     setState(() {
       _loading = true;
       _error = null;
     });
 
     String? err;
-    if (widget.onRegister != null) {
-      err = await widget.onRegister!(_username.text.trim(), _email.text.trim(), _password.text);
-    } else {
-      await Future.delayed(const Duration(milliseconds: 600)); // TODO: ต่อ API สมัครสมาชิก
+    try {
+      if (widget.onRegister != null) {
+        err = await widget.onRegister!(
+            _username.text.trim(), _email.text.trim(), _password.text);
+      } else {
+        await ApiClient.instance.request('POST', '/auth/register', {
+          'username': _username.text.trim(),
+          'email': _email.text.trim(),
+          'password': _password.text
+        });
+      }
+    } catch (e) {
+      err = '$e';
     }
 
     if (!mounted) return;
@@ -64,7 +72,8 @@ class _RegisterViewState extends State<RegisterView> {
 
   Widget _label(String text) => Padding(
         padding: const EdgeInsets.only(bottom: 6),
-        child: Text(text, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+        child: Text(text,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
       );
 
   InputDecoration _dec(String hint, IconData icon, {Widget? suffix}) {
@@ -87,7 +96,8 @@ class _RegisterViewState extends State<RegisterView> {
   }
 
   Widget _eye(bool hidden, VoidCallback onTap) => IconButton(
-        icon: Icon(hidden ? Icons.visibility_off : Icons.visibility, size: 20, color: Colors.grey),
+        icon: Icon(hidden ? Icons.visibility_off : Icons.visibility,
+            size: 20, color: Colors.grey),
         onPressed: onTap,
       );
 
@@ -106,7 +116,7 @@ class _RegisterViewState extends State<RegisterView> {
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 15,
                   offset: const Offset(0, 5),
                 ),
@@ -124,20 +134,25 @@ class _RegisterViewState extends State<RegisterView> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: primaryGreen.withOpacity(0.1),
+                            color: primaryGreen.withValues(alpha: 0.1),
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(Icons.store, size: 48, color: primaryGreen),
+                          child:
+                              Icon(Icons.store, size: 48, color: primaryGreen),
                         ),
                         const SizedBox(height: 16),
                         const Text(
                           'Create account',
-                          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black87),
+                          style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87),
                         ),
                         const SizedBox(height: 6),
                         Text(
                           'Sign up to start tracking your items',
-                          style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                          style:
+                              TextStyle(fontSize: 13, color: Colors.grey[600]),
                         ),
                       ],
                     ),
@@ -165,7 +180,9 @@ class _RegisterViewState extends State<RegisterView> {
                     validator: (v) {
                       final t = v?.trim() ?? '';
                       if (t.isEmpty) return 'Please enter your email';
-                      if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(t)) return 'Invalid email';
+                      if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(t)) {
+                        return 'Invalid email';
+                      }
                       return null;
                     },
                   ),
@@ -178,11 +195,14 @@ class _RegisterViewState extends State<RegisterView> {
                     decoration: _dec(
                       '••••••••',
                       Icons.lock_outline,
-                      suffix: _eye(_hidePassword, () => setState(() => _hidePassword = !_hidePassword)),
+                      suffix: _eye(_hidePassword,
+                          () => setState(() => _hidePassword = !_hidePassword)),
                     ),
                     validator: (v) {
-                      if (v == null || v.isEmpty) return 'Please enter a password';
-                      if (v.length < 6) return 'At least 6 characters';
+                      if (v == null || v.isEmpty) {
+                        return 'Please enter a password';
+                      }
+                      if (v.length < 8) return 'At least 8 characters';
                       return null;
                     },
                   ),
@@ -196,13 +216,16 @@ class _RegisterViewState extends State<RegisterView> {
                     decoration: _dec(
                       '••••••••',
                       Icons.lock_outline,
-                      suffix: _eye(_hideConfirm, () => setState(() => _hideConfirm = !_hideConfirm)),
+                      suffix: _eye(_hideConfirm,
+                          () => setState(() => _hideConfirm = !_hideConfirm)),
                     ),
-                    validator: (v) => v != _password.text ? 'Passwords do not match' : null,
+                    validator: (v) =>
+                        v != _password.text ? 'Passwords do not match' : null,
                   ),
                   if (_error != null) ...[
                     const SizedBox(height: 12),
-                    Text(_error!, style: const TextStyle(color: Color(0xFFDC2626))),
+                    Text(_error!,
+                        style: const TextStyle(color: Color(0xFFDC2626))),
                   ],
                   const SizedBox(height: 24),
                   SizedBox(
@@ -212,7 +235,8 @@ class _RegisterViewState extends State<RegisterView> {
                         backgroundColor: primaryGreen,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
                         elevation: 0,
                       ),
                       onPressed: _loading ? null : _submit,
@@ -220,21 +244,28 @@ class _RegisterViewState extends State<RegisterView> {
                           ? const SizedBox(
                               width: 20,
                               height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white),
                             )
-                          : const Text('Register', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                          : const Text('Register',
+                              style: TextStyle(
+                                  fontSize: 15, fontWeight: FontWeight.bold)),
                     ),
                   ),
                   const SizedBox(height: 16),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text('Already have an account?', style: TextStyle(fontSize: 13)),
+                      const Text('Already have an account?',
+                          style: TextStyle(fontSize: 13)),
                       TextButton(
                         onPressed: () => Navigator.pop(context),
                         child: Text(
                           'Log in',
-                          style: TextStyle(color: primaryGreen, fontSize: 13, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                              color: primaryGreen,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold),
                         ),
                       ),
                     ],

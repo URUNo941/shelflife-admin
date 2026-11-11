@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../services/api_client.dart';
+import 'login_view.dart';
 
 import 'user_data.dart';
 import 'user_inventory_view.dart';
@@ -17,6 +19,11 @@ class UserMainView extends StatefulWidget {
 
 class _UserMainViewState extends State<UserMainView> {
   int _index = 0;
+  @override
+  void initState() {
+    super.initState();
+    UserInventory.instance.refresh();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,11 +34,36 @@ class _UserMainViewState extends State<UserMainView> {
         foregroundColor: Colors.white,
         title: Text(const ['Home', 'My Inventory', 'My Account'][_index]),
       ),
-      body: switch (_index) {
-        0 => UserHomeView(onSeeAll: () => setState(() => _index = 1)),
-        1 => const UserInventoryView(),
-        _ => UserProfileView(onLogout: widget.onLogout),
-      },
+      body: ListenableBuilder(
+          listenable: UserInventory.instance,
+          builder: (context, _) {
+            final inv = UserInventory.instance;
+            if (inv.loading) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (inv.error != null) {
+              return Center(
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Text(inv.error!),
+                TextButton(onPressed: inv.refresh, child: const Text('Retry')),
+                TextButton(
+                    onPressed: () {
+                      ApiClient.instance.logout();
+                      inv.clear();
+                      Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(builder: (_) => const LoginView()),
+                          (_) => false);
+                    },
+                    child: const Text('Return to sign in'))
+              ]));
+            }
+            return switch (_index) {
+              0 => UserHomeView(onSeeAll: () => setState(() => _index = 1)),
+              1 => const UserInventoryView(),
+              _ => UserProfileView(onLogout: widget.onLogout),
+            };
+          }),
       floatingActionButton: _index == 2
           ? null
           : FloatingActionButton(
@@ -48,8 +80,10 @@ class _UserMainViewState extends State<UserMainView> {
         onDestinationSelected: (i) => setState(() => _index = i),
         destinations: const [
           NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Home'),
-          NavigationDestination(icon: Icon(Icons.inventory_2_outlined), label: 'Inventory'),
-          NavigationDestination(icon: Icon(Icons.person_outline), label: 'Account'),
+          NavigationDestination(
+              icon: Icon(Icons.inventory_2_outlined), label: 'Inventory'),
+          NavigationDestination(
+              icon: Icon(Icons.person_outline), label: 'Account'),
         ],
       ),
     );
@@ -70,7 +104,9 @@ class UserHomeView extends StatelessWidget {
         final expired = items.where((i) => i.isExpired).length;
         final soon = items.where((i) => i.isExpiringSoon).length;
         final fresh = items.length - expired - soon;
-        final urgent = items.where((i) => i.isExpired || i.isExpiringSoon).toList()
+        final urgent = items
+            .where((i) => i.isExpired || i.isExpiringSoon)
+            .toList()
           ..sort((a, b) => a.expiry.compareTo(b.expiry));
 
         return SingleChildScrollView(
@@ -79,7 +115,8 @@ class UserHomeView extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text('Welcome back,', style: TextStyle(color: Colors.grey)),
-              const Text('My Shelf', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+              const Text('My Shelf',
+                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
               const SizedBox(height: 20),
               GridView.count(
                 crossAxisCount: 2,
@@ -89,20 +126,28 @@ class UserHomeView extends StatelessWidget {
                 mainAxisSpacing: 16,
                 childAspectRatio: 1.4,
                 children: [
-                  _stat(Icons.inventory_2_outlined, kUserGreen, '${items.length}', 'Total Items'),
-                  _stat(Icons.schedule, const Color(0xFFD97706), '$soon', 'Expiring Soon'),
-                  _stat(Icons.warning_amber_rounded, const Color(0xFFDC2626), '$expired', 'Expired'),
-                  _stat(Icons.check_circle_outline, const Color(0xFF1E88E5), '$fresh', 'Still Fresh'),
+                  _stat(Icons.inventory_2_outlined, kUserGreen,
+                      '${items.length}', 'Total Items'),
+                  _stat(Icons.schedule, const Color(0xFFD97706), '$soon',
+                      'Expiring Soon'),
+                  _stat(Icons.warning_amber_rounded, const Color(0xFFDC2626),
+                      '$expired', 'Expired'),
+                  _stat(Icons.check_circle_outline, const Color(0xFF1E88E5),
+                      '$fresh', 'Still Fresh'),
                 ],
               ),
               const SizedBox(height: 24),
               Row(children: [
-                const Text('Use these first', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const Text('Use these first',
+                    style:
+                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const Spacer(),
                 TextButton(onPressed: onSeeAll, child: const Text('View all')),
               ]),
               if (urgent.isEmpty)
-                const Padding(padding: EdgeInsets.all(16), child: Text('Nothing is expiring soon 🎉')),
+                const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text('Nothing is expiring soon 🎉')),
               for (final item in urgent.take(3))
                 Card(
                   elevation: 0,
@@ -114,12 +159,16 @@ class UserHomeView extends StatelessWidget {
                   child: ListTile(
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => UserItemFormView(item: item)),
+                      MaterialPageRoute(
+                          builder: (_) => UserItemFormView(item: item)),
                     ),
-                    title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    title: Text(item.name,
+                        style: const TextStyle(fontWeight: FontWeight.w600)),
                     subtitle: Text(item.category),
                     trailing: Text(item.statusText,
-                        style: TextStyle(color: item.statusColor, fontWeight: FontWeight.w600)),
+                        style: TextStyle(
+                            color: item.statusColor,
+                            fontWeight: FontWeight.w600)),
                   ),
                 ),
             ],
@@ -144,14 +193,19 @@ class UserHomeView extends StatelessWidget {
           Row(children: [
             Container(
               padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
+              decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10)),
               child: Icon(icon, color: color, size: 22),
             ),
             const SizedBox(width: 12),
-            Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            Text(value,
+                style:
+                    const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
           ]),
           const SizedBox(height: 10),
-          Text(label, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+          Text(label,
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
         ],
       ),
     );

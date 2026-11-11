@@ -1,3 +1,5 @@
+import '../../services/api_client.dart';
+import 'user_scan_view.dart';
 import 'package:flutter/material.dart';
 
 import 'user_data.dart';
@@ -18,9 +20,12 @@ Future<bool> confirmDeleteItem(BuildContext context, UserItem item) async {
         textAlign: TextAlign.center,
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+        TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel')),
         FilledButton(
-          style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+          style:
+              FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
           onPressed: () => Navigator.pop(ctx, true),
           child: const Text('Delete'),
         ),
@@ -46,6 +51,7 @@ class _UserItemFormViewState extends State<UserItemFormView> {
   late String _category;
   late DateTime _expiry;
   late int _qty;
+  late String _status;
 
   bool get _isEdit => widget.item != null;
 
@@ -58,6 +64,7 @@ class _UserItemFormViewState extends State<UserItemFormView> {
     _category = i?.category ?? kCategories.first;
     _expiry = i?.expiry ?? DateTime.now().add(const Duration(days: 7));
     _qty = i?.qty ?? 1;
+    _status = i?.status ?? 'active';
   }
 
   @override
@@ -80,36 +87,75 @@ class _UserItemFormViewState extends State<UserItemFormView> {
     if (d != null) setState(() => _expiry = d);
   }
 
-  void _save() {
-    if (!_formKey.currentState!.validate()) return;
-    final inv = UserInventory.instance;
-    final item = widget.item;
-    if (item == null) {
-      inv.add(UserItem(
-        id: inv.newId(),
-        barcode: _barcode.text.trim(),
-        name: _name.text.trim(),
-        category: _category,
-        expiry: _expiry,
-        qty: _qty,
-      ));
-    } else {
-      item
-        ..barcode = _barcode.text.trim()
-        ..name = _name.text.trim()
-        ..category = _category
-        ..expiry = _expiry
-        ..qty = _qty;
-      inv.update();
+  bool _busy = false;
+  Future<void> _save() async {
+    if (_busy || !_formKey.currentState!.validate()) return;
+    setState(() => _busy = true);
+    try {
+      await UserInventory.instance.save(
+          UserItem(
+              id: widget.item?.id ?? '',
+              barcode: _barcode.text.trim(),
+              name: _name.text.trim(),
+              category: _category,
+              expiry: _expiry,
+              status: _status,
+              qty: _qty),
+          create: !_isEdit);
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('$e')));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
-    Navigator.pop(context);
   }
 
   Future<void> _delete() async {
-    final item = widget.item!;
-    if (await confirmDeleteItem(context, item) && mounted) {
-      UserInventory.instance.remove(item.id);
-      Navigator.pop(context);
+    if (_busy || !await confirmDeleteItem(context, widget.item!) || !mounted) {
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      await UserInventory.instance.remove(widget.item!.id);
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('$e')));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _lookup() async {
+    if (_barcode.text.trim().isEmpty) return;
+    try {
+      final p = await ApiClient.instance.request('GET',
+          '/products/barcodes/${Uri.encodeComponent(_barcode.text.trim())}');
+      if (mounted) {
+        setState(() {
+          _name.text = p['product_name'];
+          _category = p['category'];
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('$e')));
+      }
+    }
+  }
+
+  Future<void> _scan() async {
+    final code = await Navigator.push<String>(
+        context, MaterialPageRoute(builder: (_) => const UserScanView()));
+    if (code != null && mounted) {
+      _barcode.text = code;
+      await _lookup();
     }
   }
 
@@ -131,29 +177,40 @@ class _UserItemFormViewState extends State<UserItemFormView> {
             children: [
               TextFormField(
                 controller: _barcode,
+                onFieldSubmitted: (_) => _lookup(),
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
-                  labelText: 'Barcode *',
+                  labelText: 'Barcode (optional)',
                   border: const OutlineInputBorder(),
                   suffixIcon: IconButton(
                     tooltip: 'Scan barcode',
                     icon: const Icon(Icons.qr_code_scanner),
-                    onPressed: () {}, // TODO: ต่อกล้องสแกนบาร์โค้ด
+                    onPressed: _scan,
                   ),
                 ),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                maxLength: 50,
               ),
+              TextButton.icon(
+                  onPressed: _lookup,
+                  icon: const Icon(Icons.search),
+                  label: const Text('Look up barcode')),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _name,
-                decoration: const InputDecoration(labelText: 'Product Name *', border: OutlineInputBorder()),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                decoration: const InputDecoration(
+                    labelText: 'Product Name *', border: OutlineInputBorder()),
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Required' : null,
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
+                key: ValueKey(_category),
                 initialValue: _category,
-                decoration: const InputDecoration(labelText: 'Category *', border: OutlineInputBorder()),
-                items: kCategories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                decoration: const InputDecoration(
+                    labelText: 'Category *', border: OutlineInputBorder()),
+                items: {...kCategories, _category}
+                    .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                    .toList(),
                 onChanged: (v) => setState(() => _category = v ?? _category),
               ),
               const SizedBox(height: 16),
@@ -176,12 +233,24 @@ class _UserItemFormViewState extends State<UserItemFormView> {
                   onPressed: _qty > 1 ? () => setState(() => _qty--) : null,
                   icon: const Icon(Icons.remove_circle_outline),
                 ),
-                Text('$_qty', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                Text('$_qty',
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.bold)),
                 IconButton(
                   onPressed: () => setState(() => _qty++),
                   icon: const Icon(Icons.add_circle_outline),
                 ),
               ]),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                initialValue: _status,
+                decoration: const InputDecoration(
+                    labelText: 'Batch status', border: OutlineInputBorder()),
+                items: ['active', 'consumed', 'discarded']
+                    .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                    .toList(),
+                onChanged: (s) => setState(() => _status = s!),
+              ),
               const SizedBox(height: 24),
               Row(children: [
                 Expanded(
@@ -191,11 +260,12 @@ class _UserItemFormViewState extends State<UserItemFormView> {
                             foregroundColor: const Color(0xFFDC2626),
                             minimumSize: const Size.fromHeight(48),
                           ),
-                          onPressed: _delete,
+                          onPressed: _busy ? null : _delete,
                           child: const Text('Delete'),
                         )
                       : OutlinedButton(
-                          style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                          style: OutlinedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(48)),
                           onPressed: () => Navigator.pop(context),
                           child: const Text('Cancel'),
                         ),
@@ -207,7 +277,7 @@ class _UserItemFormViewState extends State<UserItemFormView> {
                       backgroundColor: kUserGreen,
                       minimumSize: const Size.fromHeight(48),
                     ),
-                    onPressed: _save,
+                    onPressed: _busy ? null : _save,
                     child: Text(_isEdit ? 'Save Changes' : 'Save'),
                   ),
                 ),
