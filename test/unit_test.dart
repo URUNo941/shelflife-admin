@@ -3,126 +3,8 @@ import 'package:myapp/utils/expiry_status.dart';
 import 'package:myapp/views/user/user_data.dart';
 
 void main() {
-  group('ExpiryStatus color rules', () {
-    final addedAt = DateTime(2026, 1, 1);
-    final expiryDate = DateTime(2026, 1, 11);
 
-    test('100% remaining is green', () {
-      expect(
-        ExpiryStatus.color(
-          addedAt: addedAt,
-          expiryDate: expiryDate,
-          today: addedAt,
-        ),
-        ExpiryStatus.green,
-      );
-    });
-
-    test('30% remaining is green', () {
-      expect(
-        ExpiryStatus.color(
-          addedAt: addedAt,
-          expiryDate: expiryDate,
-          today: DateTime(2026, 1, 8),
-        ),
-        ExpiryStatus.green,
-      );
-    });
-
-    test('Between 10% and below 30% remaining is yellow', () {
-      expect(
-        ExpiryStatus.color(
-          addedAt: addedAt,
-          expiryDate: expiryDate,
-          today: DateTime(2026, 1, 9),
-        ),
-        ExpiryStatus.yellow,
-      );
-      expect(
-        ExpiryStatus.color(
-          addedAt: addedAt,
-          expiryDate: expiryDate,
-          today: DateTime(2026, 1, 10),
-        ),
-        ExpiryStatus.yellow,
-      );
-    });
-
-    test('Below 10% remaining is red unless one day remains', () {
-      expect(
-        ExpiryStatus.color(
-          addedAt: DateTime(2026, 1, 1),
-          expiryDate: DateTime(2026, 4, 11),
-          today: DateTime(2026, 4, 9),
-        ),
-        ExpiryStatus.red,
-      );
-      expect(
-        ExpiryStatus.color(
-          addedAt: DateTime(2026, 1, 1),
-          expiryDate: DateTime(2026, 4, 11),
-          today: DateTime(2026, 4, 10),
-        ),
-        ExpiryStatus.yellow,
-      );
-    });
-
-    test('Expires today and expired dates are red', () {
-      expect(
-        ExpiryStatus.color(
-          addedAt: addedAt,
-          expiryDate: expiryDate,
-          today: expiryDate,
-        ),
-        ExpiryStatus.red,
-      );
-      expect(
-        ExpiryStatus.color(
-          addedAt: addedAt,
-          expiryDate: expiryDate,
-          today: DateTime(2026, 1, 12),
-        ),
-        ExpiryStatus.red,
-      );
-    });
-  });
-
-  group('UserItem expiry labels', () {
-    test('One day remaining uses singular label and yellow status', () {
-      final today = DateTime.now();
-      final item = UserItem(
-        id: 'unit-label-one-day',
-        barcode: 'unit-label-one-day',
-        name: 'Test item',
-        category: 'Food',
-        addedAt: today,
-        expiry: DateTime(today.year, today.month, today.day + 1),
-      );
-
-      expect(item.statusText, '1 day left');
-      expect(item.statusColor, ExpiryStatus.yellow);
-      expect(item.isExpiringSoon, isTrue);
-    });
-
-    test('Expired item shows days elapsed and red status', () {
-      final today = DateTime.now();
-      final item = UserItem(
-        id: 'unit-label-expired',
-        barcode: 'unit-label-expired',
-        name: 'Expired item',
-        category: 'Food',
-        addedAt: DateTime(today.year, today.month, today.day - 10),
-        expiry: DateTime(today.year, today.month, today.day - 2),
-      );
-
-      expect(item.statusText, 'Expired 2d ago');
-      expect(item.statusColor, ExpiryStatus.red);
-      expect(item.isExpired, isTrue);
-      expect(item.isCritical, isTrue);
-    });
-  });
-
-  group('UserInventory batch behavior', () {
+   group('UserInventory batch behavior', () {
     final inventory = UserInventory.instance;
     final testItemIds = <String>[];
 
@@ -273,6 +155,125 @@ void main() {
 
       expect(inventory.items, isNot(contains(first)));
       expect(inventory.items, contains(second));
+    });
+  });
+  
+  group('ExpiryStatus color rules', () {
+    final addedAt = DateTime(2026, 1, 1);
+    final expiryDate = DateTime(2026, 1, 11);
+
+    test('100% remaining is green', () {
+      expect(
+        ExpiryStatus.color(
+          addedAt: addedAt,
+          expiryDate: expiryDate,
+          today: addedAt,
+        ),
+        ExpiryStatus.green,
+      );
+    });
+
+    test('30% remaining is green', () {
+      expect(
+        ExpiryStatus.color(
+          addedAt: addedAt,
+          expiryDate: expiryDate,
+          today: DateTime(2026, 1, 8),
+        ),
+        ExpiryStatus.green,
+      );
+    });
+
+    test('Between 10% and below 30% remaining is yellow', () {
+      expect(
+        ExpiryStatus.color(
+          addedAt: addedAt,
+          expiryDate: expiryDate,
+          today: DateTime(2026, 1, 9),
+        ),
+        ExpiryStatus.yellow,
+      );
+      expect(
+        ExpiryStatus.color(
+          addedAt: addedAt,
+          expiryDate: expiryDate,
+          today: DateTime(2026, 1, 10),
+        ),
+        ExpiryStatus.yellow,
+      );
+    });
+
+    test('Below 10% remaining is red unless one day remains', () {
+      expect(
+        ExpiryStatus.color(
+          addedAt: DateTime(2026, 1, 1),
+          expiryDate: DateTime(2026, 4, 11),
+          today: DateTime(2026, 4, 9),
+        ),
+        ExpiryStatus.red,
+      );
+      expect(
+        ExpiryStatus.color(
+          addedAt: DateTime(2026, 1, 1),
+          expiryDate: DateTime(2026, 4, 11),
+          today: DateTime(2026, 4, 10),
+        ),
+        ExpiryStatus.yellow,
+      );
+    });
+
+    test('Expires today and expired dates are red', () {
+      expect(
+        ExpiryStatus.color(
+          addedAt: addedAt,
+          expiryDate: expiryDate,
+          today: expiryDate,
+        ),
+        ExpiryStatus.red,
+      );
+      expect(
+        ExpiryStatus.color(
+          addedAt: addedAt,
+          expiryDate: expiryDate,
+          today: DateTime(2026, 1, 12),
+        ),
+        ExpiryStatus.red,
+      );
+    });
+  });
+
+  group('UserItem expiry labels', () {
+    test('One day remaining uses singular label and yellow status', () {
+      final today = DateTime.now();
+      final item = UserItem(
+        id: 'unit-label-one-day',
+        barcode: 'unit-label-one-day',
+        name: 'Test item',
+        category: 'Food',
+        addedAt: today,
+        expiry: DateTime(today.year, today.month, today.day + 1),
+      );
+
+      expect(item.statusText, '1 day left');
+      expect(item.statusColor, ExpiryStatus.yellow);
+      expect(item.isExpiringSoon, isTrue);
+    });
+
+    test('Expired item shows days elapsed and red status', () {
+      final today = DateTime.now();
+      final item = UserItem(
+        id: 'unit-label-expired',
+        barcode: 'unit-label-expired',
+        name: 'Expired item',
+        category: 'Food',
+        addedAt: DateTime(today.year, today.month, today.day - 10),
+        expiry: DateTime(today.year, today.month, today.day - 2),
+      );
+
+      expect(item.statusText, 'Expired 2d ago');
+      expect(item.statusColor, ExpiryStatus.red);
+      expect(item.isExpired, isTrue);
+      expect(item.isCritical, isTrue);
     });
   });
 }

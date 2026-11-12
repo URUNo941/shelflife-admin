@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 
 class UserManagementView extends StatefulWidget {
@@ -28,38 +27,39 @@ class _UserManagementViewState extends State<UserManagementView> {
   Future<Map<String, String>?> _showUserEditor({
     Map<String, String>? user,
   }) async {
-    final usernameController = TextEditingController(
-      text: user?['username'] ?? '',
-    );
     final formKey = GlobalKey<FormState>();
+    var username = user?['username'] ?? '';
     var role = user?['role'] ?? 'User';
     final result = await showDialog<Map<String, String>>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Text(user == null ? 'Add user' : 'Edit user'),
+          title: Text(user == null ? 'Add user' : 'Edit role'),
           content: Form(
             key: formKey,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextFormField(
-                  controller: usernameController,
-                  autofocus: true,
-                  decoration: const InputDecoration(labelText: 'Username'),
-                  validator: (value) {
-                    final username = value?.trim() ?? '';
-                    if (username.isEmpty) return 'Enter a username';
-                    final alreadyExists = usersList.any(
-                      (existingUser) =>
-                          existingUser != user &&
-                          (existingUser['username'] ?? '').toLowerCase() ==
-                              username.toLowerCase(),
-                    );
-                    if (alreadyExists) return 'Username already exists';
-                    return null;
-                  },
-                ),
+                if (user == null)
+                  TextFormField(
+                    initialValue: username,
+                    autofocus: true,
+                    decoration: const InputDecoration(labelText: 'Username'),
+                    onChanged: (value) => username = value,
+                    validator: (value) {
+                      final username = value?.trim() ?? '';
+                      if (username.isEmpty) return 'Enter a username';
+                      final alreadyExists = usersList.any(
+                        (existingUser) =>
+                            (existingUser['username'] ?? '')
+                                .trim()
+                                .toLowerCase() ==
+                            username.toLowerCase(),
+                      );
+                      if (alreadyExists) return 'Username already exists';
+                      return null;
+                    },
+                  ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   initialValue: role,
@@ -86,7 +86,7 @@ class _UserManagementViewState extends State<UserManagementView> {
               onPressed: () {
                 if (!formKey.currentState!.validate()) return;
                 Navigator.pop(context, {
-                  'username': usernameController.text.trim(),
+                  'username': username.trim(),
                   'role': role,
                   'joinedDate': user?['joinedDate'] ??
                       DateTime.now().toLocal().toString().split(' ').first,
@@ -98,24 +98,27 @@ class _UserManagementViewState extends State<UserManagementView> {
         ),
       ),
     );
-    usernameController.dispose();
     return result;
   }
 
   Future<void> _addUser() async {
     final user = await _showUserEditor();
     if (user == null) return;
-    setState(() => usersList.add(user));
+    setState(() => usersList.insert(0, user));
     _showMessage('User added');
   }
 
   Future<void> _editUser(Map<String, String> user) async {
     final updatedUser = await _showUserEditor(user: user);
     if (updatedUser == null) return;
+    if (user['role'] == 'Admin' &&
+        updatedUser['role'] == 'User' &&
+        usersList.where((entry) => entry['role'] == 'Admin').length == 1) {
+      _showMessage('The last administrator cannot be demoted');
+      return;
+    }
     setState(() {
-      user
-        ..clear()
-        ..addAll(updatedUser);
+      user['role'] = updatedUser['role']!;
     });
     _showMessage('User updated');
   }
@@ -186,10 +189,9 @@ class _UserManagementViewState extends State<UserManagementView> {
   @override
   Widget build(BuildContext context) {
     final filteredUsers = usersList.where((u) {
-      final matchesSearch =
-          ('${u['username']} ${u['role']}')
-              .toLowerCase()
-              .contains(searchQuery.toLowerCase());
+      final matchesSearch = ('${u['username']} ${u['role']}')
+          .toLowerCase()
+          .contains(searchQuery.toLowerCase());
       final matchesRole = selectedRole == 'All' || u['role'] == selectedRole;
       return matchesSearch && matchesRole;
     }).toList();

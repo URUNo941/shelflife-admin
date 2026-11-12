@@ -210,16 +210,16 @@ class _LoginViewState extends State<LoginView> {
                               style: TextStyle(fontSize: 13)),
                         ],
                       ),
-                      TextButton(
-                        onPressed: () {},
-                        child: Text(
-                          'Forgot password?',
-                          style: TextStyle(
-                              color: primaryGreen,
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold),
-                        ),
-                      ),
+                      // TextButton(
+                      //   onPressed: () {},
+                      //   child: Text(
+                      //     'Forgot password?',
+                      //     style: TextStyle(
+                      //         color: primaryGreen,
+                      //         fontSize: 13,
+                      //         fontWeight: FontWeight.bold),
+                      //   ),
+                      // ),
                     ],
                   ),
                   const SizedBox(height: 24),

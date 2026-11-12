@@ -20,7 +20,8 @@ class _AddEditBarcodeViewState extends State<AddEditBarcodeView> {
   late TextEditingController _nameController;
   String _selectedCategory = 'Food';
 
-  final List<String> _categories = ['Food', 'Medicine', 'Beverage', 'Other'];
+  // final List<String> _categories = ['Food', 'Medicine', 'Beverage', 'Other'];
+  final List<String> _categories = ['Food', 'Medicine', 'Other'];
 
   @override
   void initState() {
