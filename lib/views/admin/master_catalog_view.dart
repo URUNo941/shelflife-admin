@@ -1,11 +1,20 @@
 import 'package:flutter/material.dart';
-import '../../models/mock_data.dart';
+import '../../controllers/auth_controller.dart';
+import '../../controllers/product_controller.dart';
+import '../../models/product_model.dart';
 import 'add_edit_barcode_view.dart';
 
 class MasterCatalogView extends StatefulWidget {
   final VoidCallback? onBackToDashboard;
 
-  const MasterCatalogView({super.key, this.onBackToDashboard});
+  /// ถ้าไม่ส่งมา ใช้ [ProductController.instance]
+  final ProductController? controller;
+
+  const MasterCatalogView({
+    super.key,
+    this.onBackToDashboard,
+    this.controller,
+  });
 
   @override
   State<MasterCatalogView> createState() => _MasterCatalogViewState();
@@ -16,54 +25,83 @@ class _MasterCatalogViewState extends State<MasterCatalogView> {
   String searchQuery = '';
   String sortBy = 'Barcode';
 
+  late final ProductController _products =
+      widget.controller ?? ProductController.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    _products.addListener(_onProductsChanged);
+  }
+
+  @override
+  void dispose() {
+    _products.removeListener(_onProductsChanged);
+    super.dispose();
+  }
+
+  void _onProductsChanged() {
+    if (mounted) setState(() {});
+  }
+
   Future<void> _addBarcode() async {
     final result = await Navigator.push<Map<String, String>>(
       context,
       MaterialPageRoute(
         builder: (context) => AddEditBarcodeView(
-          existingBarcodes: MockData.globalProducts
-              .map((item) => item['barcode'] ?? '')
-              .toSet(),
+          existingBarcodes:
+              _products.products.map((item) => item.barcode).toSet(),
         ),
       ),
     );
 
     if (result != null) {
-      setState(() => MockData.globalProducts.add(result));
-      _showMessage('Barcode added');
+      final error = _products.add(
+        barcode: result['barcode']!,
+        productName: result['product_name']!,
+        category: result['category']!,
+        createdBy: AuthController.instance.currentUser?.userId,
+      );
+      _showMessage(error ?? 'Barcode added');
     }
   }
 
-  Future<void> _editBarcode(Map<String, String> item) async {
+  Future<void> _editBarcode(ProductModel item) async {
     final result = await Navigator.push<Map<String, String>>(
       context,
       MaterialPageRoute(
         builder: (context) => AddEditBarcodeView(
-          initialData: Map<String, String>.from(item),
-          existingBarcodes: MockData.globalProducts
-              .where((product) => !identical(product, item))
-              .map((product) => product['barcode'] ?? '')
+          initialData: {
+            'barcode': item.barcode,
+            'product_name': item.productName,
+            'category': item.category,
+          },
+          existingBarcodes: _products.products
+              .where((product) => product.productId != item.productId)
+              .map((product) => product.barcode)
               .toSet(),
         ),
       ),
     );
 
     if (result != null) {
-      item
-        ..clear()
-        ..addAll(result);
-      setState(() {});
-      _showMessage('Barcode updated');
+      final error = _products.update(
+        item.productId,
+        barcode: result['barcode']!,
+        productName: result['product_name']!,
+        category: result['category']!,
+      );
+      _showMessage(error ?? 'Barcode updated');
     }
   }
 
-  Future<void> _deleteBarcode(Map<String, String> item) async {
+  Future<void> _deleteBarcode(ProductModel item) async {
     final shouldDelete = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete barcode?'),
         content: Text(
-          'Remove ${item['product_name'] ?? 'this product'} from the catalog?',
+          'Remove ${item.productName} from the catalog?',
         ),
         actions: [
           TextButton(
@@ -80,19 +118,15 @@ class _MasterCatalogViewState extends State<MasterCatalogView> {
     );
 
     if (shouldDelete == true) {
-      setState(() => MockData.globalProducts.remove(item));
-      _showMessage('Barcode deleted');
+      _products.delete(item.productId);
+      if (mounted) _showMessage('Barcode deleted');
     }
   }
 
   Future<void> _showCategoryFilter() async {
     final categories = [
       'All',
-      ...MockData.globalProducts
-          .map((item) => item['category'] ?? 'Other')
-          .toSet()
-          .toList()
-        ..sort(),
+      ..._products.categories,
     ];
     final category = await showModalBottomSheet<String>(
       context: context,
@@ -134,7 +168,7 @@ class _MasterCatalogViewState extends State<MasterCatalogView> {
               title: Text('Sort products',
                   style: TextStyle(fontWeight: FontWeight.bold)),
             ),
-            for (final option in ['Barcode', 'Name', 'Category'])
+            for (final option in ProductController.sortOptions)
               ListTile(
                 title: Text(option),
                 trailing: sortBy == option
@@ -160,32 +194,10 @@ class _MasterCatalogViewState extends State<MasterCatalogView> {
 
   @override
   Widget build(BuildContext context) {
-    final filteredProducts = MockData.globalProducts.where((item) {
-      final barcode = (item['barcode'] ?? '').toLowerCase();
-      final productName = (item['product_name'] ?? '').toLowerCase();
-      final category = item['category'] ?? '';
-
-      final matchesSearch = barcode.contains(searchQuery.toLowerCase()) ||
-          productName.contains(searchQuery.toLowerCase());
-      final matchesCategory = selectedCategory == 'All' || category == selectedCategory;
-
-      return matchesSearch && matchesCategory;
-    }).toList();
-    filteredProducts.sort(
-      (a, b) => (a[{
-        'Barcode': 'barcode',
-        'Name': 'product_name',
-        'Category': 'category',
-      }[sortBy]] ??
-              '')
-          .compareTo(
-            b[{
-              'Barcode': 'barcode',
-              'Name': 'product_name',
-              'Category': 'category',
-            }[sortBy]] ??
-                '',
-          ),
+    final filteredProducts = _products.search(
+      query: searchQuery,
+      category: selectedCategory,
+      sortBy: sortBy,
     );
 
     return Scaffold(
@@ -292,17 +304,9 @@ class _MasterCatalogViewState extends State<MasterCatalogView> {
                 child: Row(
                   children: [
                     'All',
-                    ...MockData.globalProducts
-                        .map((item) => item['category'] ?? 'Other')
-                        .toSet()
-                        .toList()
-                      ..sort(),
+                    ..._products.categories,
                   ].map((category) {
-                    final count = category == 'All'
-                        ? MockData.globalProducts.length
-                        : MockData.globalProducts
-                            .where((item) => item['category'] == category)
-                            .length;
+                    final count = _products.countInCategory(category);
                     final isSelected = selectedCategory == category;
                     return Padding(
                       padding: const EdgeInsets.only(right: 8.0),
@@ -356,15 +360,15 @@ class _MasterCatalogViewState extends State<MasterCatalogView> {
                                 child: const Icon(Icons.shopping_bag_outlined, color: Color(0xFF0D7A53)),
                               ),
                               title: Text(
-                                item['barcode'] ?? '',
+                                item.barcode,
                                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                               ),
                               subtitle: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(item['product_name'] ?? '', style: const TextStyle(fontSize: 13)),
+                                  Text(item.productName, style: const TextStyle(fontSize: 13)),
                                   Text(
-                                    item['category'] ?? '',
+                                    item.category,
                                     style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
                                   ),
                                 ],

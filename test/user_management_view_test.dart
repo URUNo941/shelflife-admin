@@ -1,11 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:myapp/controllers/user_controller.dart';
+import 'package:myapp/models/user_model.dart';
 import 'package:myapp/views/admin/user_management_view.dart';
 
 void main() {
+  // แต่ละ test ได้ controller ใหม่ ข้อมูลจึงไม่ปนกันระหว่าง test
+  UserController freshController() => UserController(seed: [
+        for (final (id, name, role) in [
+          (1, 'tom123', UserModel.roleAdmin),
+          (2, 'sarah', UserModel.roleUser),
+          (3, 'john', UserModel.roleUser),
+          (4, 'patlee', UserModel.roleUser),
+        ])
+          UserModel(
+            userId: id,
+            username: name,
+            role: role,
+            createdAt: DateTime(2026, 10, id),
+          ),
+      ]);
+
   Future<void> openUserManagement(WidgetTester tester) async {
     await tester.pumpWidget(
-      const MaterialApp(home: UserManagementView()),
+      MaterialApp(home: UserManagementView(controller: freshController())),
     );
   }
 

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../controllers/product_controller.dart';
 import 'user_data.dart';
+import 'user_scan_view.dart';
 
 /// Dialog ยืนยันลบ (หน้า 6) ใช้ได้จากทั้งหน้า list และหน้า edit
 Future<bool> confirmDeleteItem(BuildContext context, UserItem item) async {
@@ -72,6 +74,28 @@ class _UserItemFormViewState extends State<UserItemFormView> {
 
   String _fmt(DateTime d) =>
       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+
+  /// เปิดกล้องสแกน แล้วใส่ barcode ที่ได้ลงฟอร์ม
+  Future<void> _scanBarcode() async {
+    final code = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => const UserScanView()),
+    );
+    if (code == null || !mounted) return;
+    _barcode.text = code;
+    _fillFromCatalog(code);
+  }
+
+  /// ถ้า barcode อยู่ใน Master Catalog และยังไม่ได้กรอกชื่อ ให้เติมชื่อ/หมวดหมู่ให้
+  void _fillFromCatalog(String code) {
+    if (_name.text.trim().isNotEmpty) return;
+    final product = ProductController.instance.findByBarcode(code);
+    if (product == null) return;
+    setState(() {
+      _name.text = product.productName;
+      if (kCategories.contains(product.category)) _category = product.category;
+    });
+  }
 
   Future<void> _pickDate() async {
     final d = await showDatePicker(
@@ -171,9 +195,10 @@ class _UserItemFormViewState extends State<UserItemFormView> {
                   suffixIcon: IconButton(
                     tooltip: 'Scan barcode',
                     icon: const Icon(Icons.qr_code_scanner),
-                    onPressed: () {}, // TODO: ต่อกล้องสแกนบาร์โค้ด
+                    onPressed: _scanBarcode,
                   ),
                 ),
+                onChanged: _fillFromCatalog,
                 validator: (v) =>
                     (v == null || v.trim().isEmpty) ? 'Required' : null,
               ),
@@ -187,6 +212,7 @@ class _UserItemFormViewState extends State<UserItemFormView> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
+                key: ValueKey(_category),
                 initialValue: _category,
                 decoration: const InputDecoration(
                     labelText: 'Category *', border: OutlineInputBorder()),

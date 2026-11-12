@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../controllers/auth_controller.dart';
+import '../../controllers/product_controller.dart';
+import '../../controllers/user_controller.dart';
+import '../../controllers/user_inventory_controller.dart';
 import '../user/login_view.dart' show LoginView;
 
 class AdminDashboardView extends StatelessWidget {
@@ -8,6 +12,24 @@ class AdminDashboardView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // ตัวเลขบนการ์ดอัปเดตตามข้อมูลใน controller
+    return ListenableBuilder(
+      listenable: Listenable.merge([
+        UserController.instance,
+        ProductController.instance,
+        UserInventory.instance,
+      ]),
+      builder: (context, _) => _buildContent(context),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
+    final totalUsers = UserController.instance.users.length;
+    final totalBarcodes = ProductController.instance.products.length;
+    final inventoryItems = UserInventory.instance.totalQuantity;
+    final expiredItems = UserInventory.instance.expiredCount;
+    final adminName = AuthController.instance.currentUser?.username ?? 'Admin';
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20.0),
       child: Column(
@@ -79,18 +101,19 @@ class AdminDashboardView extends StatelessWidget {
                         context: context,
                         builder: (context) => AlertDialog(
                           title: const Text('Notifications'),
-                          content: const Column(
+                          content: Column(
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               ListTile(
                                 contentPadding: EdgeInsets.zero,
-                                leading: Icon(Icons.warning_amber_rounded,
+                                leading: const Icon(Icons.warning_amber_rounded,
                                     color: Colors.orange),
-                                title: Text('42 items are expired'),
-                                subtitle: Text('Review inventory status'),
+                                title: Text(
+                                    '$expiredItems item${expiredItems == 1 ? ' is' : 's are'} expired'),
+                                subtitle: const Text('Review inventory status'),
                               ),
-                              ListTile(
+                              const ListTile(
                                 contentPadding: EdgeInsets.zero,
                                 leading: Icon(Icons.person_add_alt_1,
                                     color: Color(0xFF0D7A53)),
@@ -119,15 +142,16 @@ class AdminDashboardView extends StatelessWidget {
                           context: context,
                           builder: (context) => AlertDialog(
                             title: const Text('Admin profile'),
-                            content: const ListTile(
+                            content: ListTile(
                               contentPadding: EdgeInsets.zero,
                               leading: CircleAvatar(
-                                backgroundColor: Color(0xFFDCFCE7),
-                                child: Text('A',
-                                    style: TextStyle(color: Color(0xFF0D7A53))),
+                                backgroundColor: const Color(0xFFDCFCE7),
+                                child: Text(adminName[0].toUpperCase(),
+                                    style: const TextStyle(
+                                        color: Color(0xFF0D7A53))),
                               ),
-                              title: Text('Admin'),
-                              subtitle: Text('Administrator account'),
+                              title: Text(adminName),
+                              subtitle: const Text('Administrator account'),
                             ),
                             actions: [
                               TextButton(
@@ -161,6 +185,7 @@ class AdminDashboardView extends StatelessWidget {
                                       !context.mounted) {
                                     return;
                                   }
+                                  AuthController.instance.logout();
                                   Navigator.of(context).pushAndRemoveUntil(
                                     MaterialPageRoute<void>(
                                       builder: (_) => const LoginView(),
@@ -221,9 +246,9 @@ class AdminDashboardView extends StatelessWidget {
             'Welcome back,',
             style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
           ),
-          const Text(
-            'Admin',
-            style: TextStyle(
+          Text(
+            adminName,
+            style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: Colors.black87),
@@ -243,28 +268,28 @@ class AdminDashboardView extends StatelessWidget {
                 icon: Icons.people_outline_rounded,
                 iconBgColor: const Color(0xFFDCFCE7),
                 iconColor: const Color(0xFF0D7A53),
-                value: '128',
+                value: '$totalUsers',
                 label: 'Total Users',
               ),
               _buildStatCard(
                 icon: Icons.qr_code_2_rounded,
                 iconBgColor: const Color(0xFFDCFCE7),
                 iconColor: const Color(0xFF0D7A53),
-                value: '350',
+                value: '$totalBarcodes',
                 label: 'Global Barcodes',
               ),
               _buildStatCard(
                 icon: Icons.widgets_outlined,
                 iconBgColor: const Color(0xFFFEF3C7),
                 iconColor: const Color(0xFFD97706),
-                value: '1,240',
+                value: '$inventoryItems',
                 label: 'Inventory Items',
               ),
               _buildStatCard(
                 icon: Icons.warning_amber_rounded,
                 iconBgColor: const Color(0xFFFEE2E2),
                 iconColor: const Color(0xFFDC2626),
-                value: '42',
+                value: '$expiredItems',
                 label: 'Expired Items',
               ),
             ],
@@ -318,7 +343,7 @@ class AdminDashboardView extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),

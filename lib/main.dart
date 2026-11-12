@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:myapp/views/user/login_view.dart';
-
+import 'package:myapp/views/user/user_main_view.dart';
 
 void main() {
   runApp(const MyApp());
@@ -18,7 +18,7 @@ class MyApp extends StatelessWidget {
         primaryColor: const Color(0xFF0D7A53),
         useMaterial3: true,
       ),
-      home: const LoginView(),
+      home: const UserMainView(),
     );
   }
 }

@@ -1,15 +1,10 @@
 const con = require('../db_config');
 
-function query(sql, values = []) {
-  return new Promise((resolve, reject) => {
-    con.query(sql, values, (error, result) => {
-      if (error) {
-        reject(error);
-        return;
-      }
-      resolve(result);
-    });
-  });
+// db_config exports a mysql2/promise pool: query() returns [rows, fields]
+// and ignores callbacks, so await it instead of passing one.
+async function query(sql, values = []) {
+  const [result] = await con.query(sql, values);
+  return result;
 }
 
 function handleDatabaseError(res, error) {

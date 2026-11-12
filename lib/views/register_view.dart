@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../controllers/auth_controller.dart';
+
 /// หน้าสมัครสมาชิก (Register) ดีไซน์เดียวกับหน้า Login
 ///
 /// [onRegister] ใช้ต่อ API ทีหลัง: รับ username, email, password แล้วคืนข้อความ error
@@ -46,7 +48,11 @@ class _RegisterViewState extends State<RegisterView> {
     if (widget.onRegister != null) {
       err = await widget.onRegister!(_username.text.trim(), _email.text.trim(), _password.text);
     } else {
-      await Future.delayed(const Duration(milliseconds: 600)); // TODO: ต่อ API สมัครสมาชิก
+      err = AuthController.instance.register(
+        username: _username.text.trim(),
+        email: _email.text.trim(),
+        password: _password.text,
+      );
     }
 
     if (!mounted) return;
@@ -106,7 +112,7 @@ class _RegisterViewState extends State<RegisterView> {
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 15,
                   offset: const Offset(0, 5),
                 ),
@@ -124,7 +130,7 @@ class _RegisterViewState extends State<RegisterView> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: primaryGreen.withOpacity(0.1),
+                            color: primaryGreen.withValues(alpha: 0.1),
                             shape: BoxShape.circle,
                           ),
                           child: Icon(Icons.store, size: 48, color: primaryGreen),
@@ -148,12 +154,7 @@ class _RegisterViewState extends State<RegisterView> {
                     controller: _username,
                     textInputAction: TextInputAction.next,
                     decoration: _dec('username', Icons.person_outline),
-                    validator: (v) {
-                      final t = v?.trim() ?? '';
-                      if (t.isEmpty) return 'Please enter a username';
-                      if (t.length < 3) return 'At least 3 characters';
-                      return null;
-                    },
+                    validator: (v) => AuthController.validateUsername(v ?? ''),
                   ),
                   const SizedBox(height: 18),
                   _label('Email'),
@@ -162,12 +163,7 @@ class _RegisterViewState extends State<RegisterView> {
                     keyboardType: TextInputType.emailAddress,
                     textInputAction: TextInputAction.next,
                     decoration: _dec('name@example.com', Icons.email_outlined),
-                    validator: (v) {
-                      final t = v?.trim() ?? '';
-                      if (t.isEmpty) return 'Please enter your email';
-                      if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(t)) return 'Invalid email';
-                      return null;
-                    },
+                    validator: (v) => AuthController.validateEmail(v ?? ''),
                   ),
                   const SizedBox(height: 18),
                   _label('Password'),
@@ -180,11 +176,7 @@ class _RegisterViewState extends State<RegisterView> {
                       Icons.lock_outline,
                       suffix: _eye(_hidePassword, () => setState(() => _hidePassword = !_hidePassword)),
                     ),
-                    validator: (v) {
-                      if (v == null || v.isEmpty) return 'Please enter a password';
-                      if (v.length < 6) return 'At least 6 characters';
-                      return null;
-                    },
+                    validator: (v) => AuthController.validatePassword(v ?? ''),
                   ),
                   const SizedBox(height: 18),
                   _label('Confirm password'),

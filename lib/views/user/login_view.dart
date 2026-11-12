@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../controllers/auth_controller.dart';
 import '../admin/admin_main_view.dart';
 import 'user_main_view.dart';
 import 'package:myapp/views/register_view.dart';
@@ -23,13 +24,15 @@ class _LoginViewState extends State<LoginView> {
   void _handleLogin() {
     if (!_formKey.currentState!.validate()) return;
 
-    final username = _emailController.text.trim().toLowerCase();
-    final password = _passwordController.text;
-    final Widget? destination = switch ((username, password)) {
-      ('admin', '1234') => const AdminMainView(),
-      ('user', '1234') => const UserMainView(),
-      _ => null,
-    };
+    final user = AuthController.instance.login(
+      _emailController.text.trim(),
+      _passwordController.text,
+    );
+    final Widget? destination = user == null
+        ? null
+        : user.isAdmin
+            ? const AdminMainView()
+            : const UserMainView();
 
     if (destination == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -66,7 +69,7 @@ class _LoginViewState extends State<LoginView> {
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 15,
                   offset: const Offset(0, 5),
                 ),
@@ -84,7 +87,7 @@ class _LoginViewState extends State<LoginView> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: primaryGreen.withOpacity(0.1),
+                            color: primaryGreen.withValues(alpha: 0.1),
                             shape: BoxShape.circle,
                           ),
                           child:
@@ -274,13 +277,4 @@ class _LoginViewState extends State<LoginView> {
       ),
     );
   }
-}
-
-void main() {
-  runApp(
-    const MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: LoginView(),
-    ),
-  );
 }

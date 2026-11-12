@@ -1,32 +1,14 @@
 import 'package:flutter/material.dart';
 
+import '../../controllers/auth_controller.dart';
+import '../../models/user_model.dart';
 import 'login_view.dart';
 import 'user_data.dart';
 
-/// ข้อมูลบัญชีผู้ใช้ (mock) ตอนต่อ API ให้แปลงข้อมูลที่ได้หลัง login เป็น class นี้
-class UserAccount {
-  final String username;
-  final String email;
-  final String role;
-  final String joined;
-  const UserAccount({
-    required this.username,
-    required this.email,
-    required this.role,
-    required this.joined,
-  });
-
-  static const mock = UserAccount(
-    username: 'sarah',
-    email: 'sarah@example.com',
-    role: 'User',
-    joined: 'Oct 5, 2026',
-  );
-}
-
 /// หน้าบัญชีของฉัน: แสดงข้อมูลบัญชี + ปุ่ม Log out
 class UserProfileView extends StatelessWidget {
-  final UserAccount account;
+  /// ถ้าไม่ส่งมา ใช้ผู้ใช้ที่ล็อกอินอยู่ใน [AuthController]
+  final UserModel? account;
 
   /// เรียกหลังผู้ใช้กดยืนยัน Log out
   /// ถ้าไม่ส่งมา จะย้อนกลับไปหน้าแรกของแอป (มักเป็นหน้า Login)
@@ -37,9 +19,16 @@ class UserProfileView extends StatelessWidget {
 
   const UserProfileView({
     super.key,
-    this.account = UserAccount.mock,
+    this.account,
     this.onLogout,
   });
+
+  static final _guest = UserModel(
+    userId: 0,
+    username: 'guest',
+    role: UserModel.roleUser,
+    createdAt: DateTime.now(),
+  );
 
   Future<void> _confirmLogout(BuildContext context) async {
     final ok = await showDialog<bool>(
@@ -67,6 +56,7 @@ class UserProfileView extends StatelessWidget {
       ),
     );
     if (ok != true || !context.mounted) return;
+    AuthController.instance.logout();
     if (onLogout != null) {
       onLogout!();
     } else {
@@ -79,6 +69,8 @@ class UserProfileView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final account =
+        this.account ?? AuthController.instance.currentUser ?? _guest;
     final initials = account.username.isEmpty
         ? '?'
         : account.username.substring(0, 1).toUpperCase();
@@ -86,8 +78,7 @@ class UserProfileView extends StatelessWidget {
     return ListenableBuilder(
       listenable: UserInventory.instance,
       builder: (context, _) {
-        final count = UserInventory.instance.items
-            .fold<int>(0, (total, item) => total + item.qty);
+        final count = UserInventory.instance.totalQuantity;
         return SingleChildScrollView(
           padding: const EdgeInsets.all(20),
           child: Column(
@@ -105,7 +96,7 @@ class UserProfileView extends StatelessWidget {
               Text(account.username,
                   style: const TextStyle(
                       fontSize: 22, fontWeight: FontWeight.bold)),
-              Text(account.email,
+              Text(account.email.isEmpty ? '-' : account.email,
                   style: TextStyle(color: Colors.grey.shade600)),
               const SizedBox(height: 24),
               Container(
@@ -117,11 +108,11 @@ class UserProfileView extends StatelessWidget {
                 child: Column(children: [
                   _row(Icons.person_outline, 'Username', account.username),
                   const Divider(height: 1),
-                  _row(Icons.email_outlined, 'Email', account.email),
+                  _row(Icons.email_outlined, 'Email', account.email.isEmpty ? '-' : account.email),
                   const Divider(height: 1),
-                  _row(Icons.badge_outlined, 'Role', account.role),
+                  _row(Icons.badge_outlined, 'Role', account.roleLabel),
                   const Divider(height: 1),
-                  _row(Icons.calendar_today_outlined, 'Joined', account.joined),
+                  _row(Icons.calendar_today_outlined, 'Joined', account.joinedLabel),
                   const Divider(height: 1),
                   _row(Icons.inventory_2_outlined, 'Items on my shelf',
                       '$count'),

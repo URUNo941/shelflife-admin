@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../controllers/product_controller.dart';
+import '../../controllers/user_controller.dart';
 
 class SystemAnalyticsView extends StatefulWidget {
   const SystemAnalyticsView({super.key});
@@ -9,6 +11,25 @@ class SystemAnalyticsView extends StatefulWidget {
 
 class _SystemAnalyticsViewState extends State<SystemAnalyticsView> {
   String selectedPeriod = 'This Month';
+
+  final _source = Listenable.merge(
+      [UserController.instance, ProductController.instance]);
+
+  @override
+  void initState() {
+    super.initState();
+    _source.addListener(_refresh);
+  }
+
+  @override
+  void dispose() {
+    _source.removeListener(_refresh);
+    super.dispose();
+  }
+
+  void _refresh() {
+    if (mounted) setState(() {});
+  }
 
   static const _periodItemStats = {
     'Today': {'active': 42, 'consumed': 6, 'discarded': 2},
@@ -100,14 +121,14 @@ class _SystemAnalyticsViewState extends State<SystemAnalyticsView> {
                     icon: Icons.people_outline_rounded,
                     iconBgColor: const Color(0xFFDCFCE7),
                     iconColor: const Color(0xFF0D7A53),
-                    value: '128',
+                    value: '${UserController.instance.users.length}',
                     label: 'Total Users',
                   ),
                   _buildStatCard(
                     icon: Icons.qr_code_2_rounded,
                     iconBgColor: const Color(0xFFDCFCE7),
                     iconColor: const Color(0xFF0D7A53),
-                    value: '350',
+                    value: '${ProductController.instance.products.length}',
                     label: 'Global Barcodes',
                   ),
                   _buildStatCard(
@@ -234,7 +255,7 @@ class _SystemAnalyticsViewState extends State<SystemAnalyticsView> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
