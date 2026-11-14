@@ -37,26 +37,51 @@ npm test
 ถ้าตั้ง `TEST_DB_HOST` (เช่น `127.0.0.1`), `TEST_DB_USER`, `TEST_DB_PASSWORD` จะทดสอบกับ MySQL จริงด้วย
 โดยสร้างฐานข้อมูลชั่วคราวชื่อสุ่มแล้วลบทิ้งเอง ไม่แตะ `shelflife_db` หรือ `shelflife_v2_db`
 
-## Run
+## รันแอปทั้งระบบ
 
-Set `JWT_SECRET` to a long, random secret in the backend process environment, then run `node server.js`. The database connection is configured in `db_config.js`; do not expose this development configuration in production. The API listens on port `3000` unless `PORT` is set.
+1. **ฐานข้อมูล:** ทำ "ติดตั้งฐานข้อมูล" ด้านบน
+2. **บัญชี admin (ครั้งแรก):** ในโฟลเดอร์ `shelflife-backend`
+   ```
+   npm run create-admin -- admin <รหัสผ่านอย่างน้อย 6 ตัว>
+   ```
+   บัญชี user ทั่วไปสมัครเองได้จากหน้า Register ในแอป
+   (บัญชีตัวอย่าง `tom123` / `sarah` ในไฟล์ SQL ใช้รหัสผ่านปลอม จึง login ไม่ได้)
+3. **Backend:** `node server.js` (ต้องมี `JWT_SECRET` ใน `.env` หรือ environment) → `http://localhost:3000`
+4. **แอป Flutter:** ที่โฟลเดอร์หลักของโปรเจกต์ `flutter run -d chrome` (หรือ `-d windows`)
+   - Android emulator ต่อ `10.0.2.2:3000` ให้เอง
+   - มือถือจริง: `flutter run --dart-define=API_BASE_URL=http://<IP เครื่องคอม>:3000/api`
+
+## ตรงตามโจทย์ตรงไหน
+
+| โจทย์ | ทำที่ไหน |
+|---|---|
+| MVC | Flutter: `lib/models`, `lib/views`, `lib/controllers` · Backend: `routes` → `controllers` → MySQL |
+| Login / Logout / Register | `POST /api/auth/login`, `/register`, logout = ลบ JWT ในแอป (`AuthController.logout`) |
+| 2 roles | `users.role` = `user` / `admin` → แอปพาไปหน้า User หรือ Admin |
+| DB connection | `db_config.js` (mysql2 pool) → `shelflife_v2_db` |
+| ≥ 3 หน้า + navigation | User: Home / Inventory / Account · Admin: Dashboard / Catalog / Users / Analytics |
+| CRUD | ของในตู้ (user), แคตตาล็อกบาร์โค้ด (admin), ผู้ใช้ (admin) |
+| Smart Barcode Auto-Fill | สแกน/พิมพ์บาร์โค้ด → `GET /api/products/master/:barcode` เติมชื่อ+หมวด |
+| Expiry Color Coding & Smart Alerts | `lib/utils/expiry_status.dart` (เขียว/เหลือง/แดง) + แถบเตือนบนหน้า Home |
+| Consumed vs Discarded Statistics | ปุ่ม Use one / Mark as consumed / discarded → `GET /api/stats/me`, `/api/stats/system` |
+| argon2id | `hashPassword()` ใน `controllers/userController.js` (`type: argon2id`) |
+| JWT role-based | `middleware/requireAuth.js` (ทุก endpoint ของ user) + `requireAdmin.js` |
 
 ## API routes
 
 | Method | Route | Access |
 |---|---|---|
-| POST | `/api/auth/login` | Public |
-| GET | `/api/items/:userId` | Existing inventory API |
-| GET | `/api/items/item/:itemId` | Inventory API |
-| POST | `/api/items` | Existing inventory API |
-| PUT | `/api/items/item/:itemId` | Inventory API |
-| DELETE | `/api/items/item/:itemId` | Inventory API |
-| GET | `/api/products` | Public |
-| GET | `/api/products/:productId` | Public |
-| GET | `/api/products/master/:barcode` | Public |
-| POST, PUT, DELETE | `/api/products` and `/api/products/:productId` | Admin bearer token |
-| GET, POST, PUT, DELETE | `/api/users` and `/api/users/:userId` | Admin bearer token |
+| POST | `/api/auth/register` | Public (สมัครได้เฉพาะ role user) |
+| POST | `/api/auth/login` | Public → `{ token, user }` |
+| GET | `/api/auth/me` | Logged in |
+| GET | `/api/items?status=active\|consumed\|discarded\|all` | Logged in (เฉพาะของตัวเอง) |
+| GET, PUT, DELETE | `/api/items/:itemId` | เจ้าของล็อต (หรือ admin) |
+| POST | `/api/items` | Logged in (เจ้าของ = ผู้ที่ login) |
+| GET | `/api/stats/me?period=today\|week\|month\|year\|all` | Logged in |
+| GET | `/api/stats/system?period=...` | Admin |
+| GET | `/api/products`, `/api/products/:productId`, `/api/products/master/:barcode` | Public |
+| POST, PUT, DELETE | `/api/products` and `/api/products/:productId` | Admin |
+| GET, POST, PUT, DELETE | `/api/users` and `/api/users/:userId` | Admin (ลบ/ลดสิทธิ์ admin คนสุดท้ายไม่ได้) |
 
-Send the login token as `Authorization: Bearer <token>` to protected routes. User responses omit password hashes; new and changed passwords are stored as Argon2 hashes.
-
-The existing inventory endpoints remain unauthenticated for compatibility with the current Flutter client. Add authenticated user ownership checks and pass bearer tokens from the client before deploying this API beyond a trusted development environment.
+ส่ง token เป็น `Authorization: Bearer <token>` ทุก request ที่ต้อง login ข้อมูลผู้ใช้ที่ตอบกลับไม่มี password hash
+ตัวอย่างคำขอทุกแบบอยู่ใน `api-demo.http` (ใช้กับ VS Code extension REST Client)

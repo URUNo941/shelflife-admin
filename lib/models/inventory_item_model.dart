@@ -54,8 +54,8 @@ class InventoryItemModel {
       category: json['category'] ?? 'General', // DB default = 'General'
       quantity: json['quantity'] ?? 1, // DB default = 1
       // วันที่จาก API มาเป็นข้อความ เช่น "2026-11-05T00:00:00.000Z" -> แปลงเป็น DateTime
-      expirationDate: DateTime.parse(json['expiration_date']),
-      createdAt: DateTime.parse(json['created_at']),
+      expirationDate: DateTime.parse(json['expiration_date']).toLocal(),
+      createdAt: DateTime.parse(json['created_at']).toLocal(), // UTC -> เวลาไทย กันวันเพี้ยน
       status: json['status'] ?? 'active', // DB default = 'active'
     );
   }

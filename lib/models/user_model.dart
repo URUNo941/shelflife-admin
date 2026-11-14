@@ -77,7 +77,7 @@ class UserModel {
       // ถ้าไม่มีวันที่ ใช้เวลาปัจจุบัน ถ้ามี ให้แปลงข้อความ ISO เป็น DateTime
       createdAt: json['created_at'] == null
           ? DateTime.now()
-          : DateTime.parse(json['created_at'] as String),
+          : DateTime.parse(json['created_at'] as String).toLocal(), // UTC -> เวลาเครื่อง
     );
   }
 

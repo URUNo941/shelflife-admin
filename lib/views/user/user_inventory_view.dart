@@ -35,10 +35,44 @@ class _UserInventoryViewState extends State<UserInventoryView> {
         MaterialPageRoute(builder: (_) => UserItemFormView(item: item)));
   }
 
+  void _showError(String? error) {
+    if (error == null || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+  }
+
   Future<void> _delete(UserItem item) async {
     if (await confirmDeleteItem(context, item)) {
-      UserInventory.instance.remove(item.id);
+      _showError(await UserInventory.instance.deleteItem(item.id));
     }
+  }
+
+  /// Mark as Consumed / Discarded ทั้งล็อต (นับเป็นสถิติลดขยะอาหาร)
+  Future<void> _finish(UserItem item, {required bool consumed}) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(consumed ? 'Mark as consumed?' : 'Mark as discarded?'),
+        content: Text(consumed
+            ? 'All ${item.qty} × ${item.name} in this batch were used up.'
+            : 'All ${item.qty} × ${item.name} in this batch were thrown away.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor:
+                    consumed ? kUserGreen : const Color(0xFFDC2626)),
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(consumed ? 'Consumed' : 'Discarded'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final inv = UserInventory.instance;
+    _showError(consumed ? await inv.markConsumed(item) : await inv.discard(item));
   }
 
   Future<void> _useOne(UserItem item) async {
@@ -48,7 +82,7 @@ class _UserInventoryViewState extends State<UserInventoryView> {
         title: const Text('Use one item?'),
         content: Text(
           'Use one ${item.name} from the batch expiring ${_formatDate(item.expiry)}? '
-          '${item.qty == 1 ? 'This will remove the batch from inventory.' : '${item.qty - 1} will remain.'}',
+          '${item.qty == 1 ? 'This is the last one, so the batch will be marked as consumed.' : '${item.qty - 1} will remain.'}',
         ),
         actions: [
           TextButton(
@@ -64,12 +98,7 @@ class _UserInventoryViewState extends State<UserInventoryView> {
       ),
     );
     if (use != true) return;
-    if (item.qty == 1) {
-      UserInventory.instance.remove(item.id);
-    } else {
-      item.qty--;
-      UserInventory.instance.update();
-    }
+    _showError(await UserInventory.instance.useOne(item));
   }
 
   String _formatDate(DateTime date) =>
@@ -282,10 +311,20 @@ class _UserInventoryViewState extends State<UserInventoryView> {
                       color: isSuggested ? kUserGreen : Colors.grey.shade600,
                     ),
                     PopupMenuButton<String>(
-                      onSelected: (value) =>
-                          value == 'edit' ? _openForm(item) : _delete(item),
+                      onSelected: (value) => switch (value) {
+                        'edit' => _openForm(item),
+                        'consumed' => _finish(item, consumed: true),
+                        'discarded' => _finish(item, consumed: false),
+                        _ => _delete(item),
+                      },
                       itemBuilder: (_) => const [
                         PopupMenuItem(value: 'edit', child: Text('Edit')),
+                        PopupMenuItem(
+                            value: 'consumed',
+                            child: Text('Mark as consumed')),
+                        PopupMenuItem(
+                            value: 'discarded',
+                            child: Text('Mark as discarded')),
                         PopupMenuItem(
                             value: 'delete', child: Text('Delete')),
                       ],

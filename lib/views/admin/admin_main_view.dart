@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../controllers/product_controller.dart';
+import '../../controllers/stats_controller.dart';
+import '../../controllers/user_controller.dart';
 import 'admin_dashboard_view.dart';
 import 'master_catalog_view.dart';
 import 'user_management_view.dart';
@@ -13,6 +16,27 @@ class AdminMainView extends StatefulWidget {
 
 class _AdminMainViewState extends State<AdminMainView> {
   int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  /// โหลดข้อมูลจริงจาก backend ตอนเข้าหน้า admin (โหมด test ไม่ทำอะไร)
+  Future<void> _load() async {
+    final errors = await Future.wait([
+      UserController.instance.load(),
+      ProductController.instance.load(),
+    ]);
+    await StatsController.instance.loadSystem();
+    final error = errors.whereType<String>().firstOrNull ??
+        StatsController.instance.lastError;
+    if (error != null && mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error)));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

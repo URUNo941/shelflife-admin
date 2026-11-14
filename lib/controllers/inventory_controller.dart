@@ -1,42 +1,37 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+
 import '../models/inventory_item_model.dart';
+import '../services/api_client.dart';
 
+/// Controller แบบง่ายที่อ่าน/เพิ่มของในตู้ผ่าน API โดยตรง (ใช้กับ InventoryListView)
+/// หน้าจอหลักของผู้ใช้ใช้ [UserInventory] แทน
+/// ทุก request แนบ JWT ของผู้ใช้ที่ล็อกอินอยู่ (ผ่าน ApiClient)
 class InventoryController {
-  // หากรันใน Android Emulator ใช้ 'http://10.0.2.2:3000/api'
-  // หากรันบน Chrome/Windows ใช้ 'http://localhost:3000/api'
-  static const String baseURL = 'http://localhost:3000/api';
+  InventoryController({ApiClient? api}) : _api = api ?? ApiClient.instance;
 
-  // ดึงรายการสินค้าทั้งหมด
-  Future<List<InventoryItemModel>> getInventoryItems(int userId) async {
+  final ApiClient _api;
+
+  /// ดึงของในตู้ (active) ของผู้ใช้ที่ล็อกอิน
+  /// [userId] เก็บไว้เพื่อความเข้ากันได้กับโค้ดเดิม backend ใช้ user จาก token เสมอ
+  Future<List<InventoryItemModel>> getInventoryItems([int? userId]) async {
     try {
-      final response = await http.get(Uri.parse('$baseURL/items/$userId'));
-      if (response.statusCode != 200) {
-        throw Exception('Server error: ${response.statusCode}');
-      }
-      List data = jsonDecode(response.body);
-      return data.map((json) => InventoryItemModel.fromJson(json)).toList();
+      final data = await _api.get('/items') as List;
+      return data
+          .map((json) => InventoryItemModel.fromJson(json as Map<String, dynamic>))
+          .toList();
     } catch (e) {
       debugPrint(e.toString());
       throw Exception('Could not connect to the server.');
     }
   }
 
-  // เพิ่มสินค้าใหม่
+  /// เพิ่มของใหม่ (backend ใช้เจ้าของจาก token ไม่ใช่ user_id ใน body)
   Future<void> addItem(Map<String, dynamic> itemData) async {
     try {
-      final response = await http.post(
-        Uri.parse('$baseURL/items'),
-        headers: {'Content-Type': 'application/json; charset=UTF-8'},
-        body: jsonEncode(itemData),
-      );
-      if (response.statusCode != 201) {
-        throw Exception('Failed to add item: ${response.statusCode}');
-      }
+      await _api.post('/items', itemData);
     } catch (e) {
       debugPrint(e.toString());
-      throw Exception('Could not connect to the server.');
+      throw Exception('Could not save the item.');
     }
   }
 }

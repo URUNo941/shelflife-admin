@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../controllers/user_controller.dart';
 import '../../models/user_model.dart';
+import '../../services/api_client.dart';
 
 class UserManagementView extends StatefulWidget {
   final VoidCallback? onBackToDashboard;
@@ -45,7 +46,10 @@ class _UserManagementViewState extends State<UserManagementView> {
   Future<Map<String, String>?> _showUserEditor({UserModel? user}) async {
     final formKey = GlobalKey<FormState>();
     var username = user?.username ?? '';
+    var password = '';
     var role = user?.roleLabel ?? 'User';
+    // แอปจริง: backend ต้องมีรหัสผ่านตอนสร้างผู้ใช้ (hash ด้วย argon2id ที่ server)
+    final needsPassword = user == null && ApiClient.instance.enabled;
     final result = await showDialog<Map<String, String>>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -65,6 +69,18 @@ class _UserManagementViewState extends State<UserManagementView> {
                     validator: (value) =>
                         _users.validateNewUsername(value ?? ''),
                   ),
+                if (needsPassword) ...[
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    obscureText: true,
+                    decoration:
+                        const InputDecoration(labelText: 'Temporary password'),
+                    onChanged: (value) => password = value,
+                    validator: (value) => (value ?? '').length < 6
+                        ? 'At least 6 characters'
+                        : null,
+                  ),
+                ],
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   initialValue: role,
@@ -92,6 +108,7 @@ class _UserManagementViewState extends State<UserManagementView> {
                 if (!formKey.currentState!.validate()) return;
                 Navigator.pop(context, {
                   'username': username.trim(),
+                  'password': password,
                   'role': role,
                 });
               },
@@ -107,15 +124,19 @@ class _UserManagementViewState extends State<UserManagementView> {
   Future<void> _addUser() async {
     final user = await _showUserEditor();
     if (user == null) return;
-    final error = _users.add(username: user['username']!, role: user['role']!);
-    _showMessage(error ?? 'User added');
+    final error = await _users.create(
+      username: user['username']!,
+      role: user['role']!,
+      password: user['password'] ?? '',
+    );
+    if (mounted) _showMessage(error ?? 'User added');
   }
 
   Future<void> _editUser(UserModel user) async {
     final updatedUser = await _showUserEditor(user: user);
     if (updatedUser == null) return;
-    final error = _users.changeRole(user.userId, updatedUser['role']!);
-    _showMessage(error ?? 'User updated');
+    final error = await _users.setRole(user.userId, updatedUser['role']!);
+    if (mounted) _showMessage(error ?? 'User updated');
   }
 
   Future<void> _deleteUser(UserModel user) async {
@@ -143,7 +164,7 @@ class _UserManagementViewState extends State<UserManagementView> {
       ),
     );
     if (shouldDelete == true) {
-      final error = _users.delete(user.userId);
+      final error = await _users.remove(user.userId);
       if (mounted) _showMessage(error ?? 'User deleted');
     }
   }

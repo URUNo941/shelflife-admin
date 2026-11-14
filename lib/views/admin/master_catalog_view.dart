@@ -56,13 +56,13 @@ class _MasterCatalogViewState extends State<MasterCatalogView> {
     );
 
     if (result != null) {
-      final error = _products.add(
+      final error = await _products.create(
         barcode: result['barcode']!,
         productName: result['product_name']!,
         category: result['category']!,
         createdBy: AuthController.instance.currentUser?.userId,
       );
-      _showMessage(error ?? 'Barcode added');
+      if (mounted) _showMessage(error ?? 'Barcode added');
     }
   }
 
@@ -85,13 +85,13 @@ class _MasterCatalogViewState extends State<MasterCatalogView> {
     );
 
     if (result != null) {
-      final error = _products.update(
+      final error = await _products.edit(
         item.productId,
         barcode: result['barcode']!,
         productName: result['product_name']!,
         category: result['category']!,
       );
-      _showMessage(error ?? 'Barcode updated');
+      if (mounted) _showMessage(error ?? 'Barcode updated');
     }
   }
 
@@ -118,8 +118,8 @@ class _MasterCatalogViewState extends State<MasterCatalogView> {
     );
 
     if (shouldDelete == true) {
-      _products.delete(item.productId);
-      if (mounted) _showMessage('Barcode deleted');
+      final error = await _products.remove(item.productId);
+      if (mounted) _showMessage(error ?? 'Barcode deleted');
     }
   }
 

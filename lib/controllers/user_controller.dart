@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/mock_data.dart';
 import '../models/user_model.dart';
+import '../services/api_client.dart';
 
 /// Controller จัดการผู้ใช้ (หน้า User Management) เก็บข้อมูลในหน่วยความจำ
 class UserController extends ChangeNotifier {
@@ -107,6 +108,86 @@ class UserController extends ChangeNotifier {
     _users.removeWhere((u) => u.userId == userId);
     notifyListeners();
     return null;
+  }
+
+  // ---------------------------------------------------------------------------
+  // เวอร์ชัน async ที่หน้าจอเรียก: ถ้าเปิด API จะไปที่ /api/users (admin เท่านั้น)
+  // ไม่งั้นใช้ข้อมูลในหน่วยความจำ (method sync ด้านบน)
+  // ---------------------------------------------------------------------------
+  ApiClient get _api => ApiClient.instance;
+  bool get _online => _api.enabled;
+
+  /// ดึงรายชื่อผู้ใช้ล่าสุดจาก backend
+  Future<String?> load() async {
+    if (!_online) return null;
+    try {
+      final rows = await _api.get('/users') as List;
+      _users
+        ..clear()
+        ..addAll(rows.map((r) => UserModel.fromJson(r as Map<String, dynamic>)));
+      notifyListeners();
+      return null;
+    } on ApiException catch (e) {
+      return e.message;
+    }
+  }
+
+  Future<String?> create({
+    required String username,
+    String role = UserModel.roleUser,
+    String email = '',
+    String password = '',
+  }) async {
+    if (!_online) return add(username: username, role: role, email: email);
+    final error = validateNewUsername(username);
+    if (error != null) return error;
+    if (password.length < 6) return 'Password must be at least 6 characters';
+    try {
+      final row = await _api.post('/users', {
+        'username': username.trim(),
+        if (email.trim().isNotEmpty) 'email': email.trim(),
+        'password': password,
+        'role': UserModel.normalizeRole(role),
+      });
+      _users.insert(0, UserModel.fromJson(row as Map<String, dynamic>));
+      notifyListeners();
+      return null;
+    } on ApiException catch (e) {
+      return e.message;
+    }
+  }
+
+  Future<String?> setRole(int userId, String role) async {
+    if (!_online) return changeRole(userId, role);
+    try {
+      final row = await _api.put('/users/$userId', {
+        'role': UserModel.normalizeRole(role),
+      });
+      final index = _users.indexWhere((u) => u.userId == userId);
+      if (index >= 0) _users[index] = UserModel.fromJson(row as Map<String, dynamic>);
+      notifyListeners();
+      return null;
+    } on ApiException catch (e) {
+      return e.message;
+    }
+  }
+
+  Future<String?> remove(int userId) async {
+    if (!_online) return delete(userId);
+    try {
+      await _api.delete('/users/$userId');
+      _users.removeWhere((u) => u.userId == userId);
+      notifyListeners();
+      return null;
+    } on ApiException catch (e) {
+      return e.message;
+    }
+  }
+
+  /// ล้างข้อมูลตอน logout (โหมด API)
+  void clearCache() {
+    _users.clear();
+    notifyListeners();
   }
 
   /// คืนค่าข้อมูลเริ่มต้น (ใช้ใน test)

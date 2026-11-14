@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../controllers/auth_controller.dart';
 import '../../controllers/product_controller.dart';
 import '../../controllers/user_controller.dart';
-import '../../controllers/user_inventory_controller.dart';
+import '../../controllers/stats_controller.dart';
 import '../user/login_view.dart' show LoginView;
 
 class AdminDashboardView extends StatelessWidget {
@@ -17,17 +17,20 @@ class AdminDashboardView extends StatelessWidget {
       listenable: Listenable.merge([
         UserController.instance,
         ProductController.instance,
-        UserInventory.instance,
+        StatsController.instance,
       ]),
       builder: (context, _) => _buildContent(context),
     );
   }
 
   Widget _buildContent(BuildContext context) {
-    final totalUsers = UserController.instance.users.length;
-    final totalBarcodes = ProductController.instance.products.length;
-    final inventoryItems = UserInventory.instance.totalQuantity;
-    final expiredItems = UserInventory.instance.expiredCount;
+    // ตัวเลขทั้งระบบจาก GET /api/stats/system (ทุกผู้ใช้ ไม่ใช่แค่ตู้ของ admin)
+    final system = StatsController.instance.system;
+    final totalUsers = system.totalUsers ?? UserController.instance.users.length;
+    final totalBarcodes =
+        system.totalProducts ?? ProductController.instance.products.length;
+    final inventoryItems = system.active.quantity;
+    final expiredItems = system.expired.batches;
     final adminName = AuthController.instance.currentUser?.username ?? 'Admin';
 
     return SingleChildScrollView(
@@ -110,7 +113,7 @@ class AdminDashboardView extends StatelessWidget {
                                 leading: const Icon(Icons.warning_amber_rounded,
                                     color: Colors.orange),
                                 title: Text(
-                                    '$expiredItems item${expiredItems == 1 ? ' is' : 's are'} expired'),
+                                    '$expiredItems batch${expiredItems == 1 ? ' is' : 'es are'} expired'),
                                 subtitle: const Text('Review inventory status'),
                               ),
                               const ListTile(

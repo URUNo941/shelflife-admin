@@ -48,7 +48,7 @@ class _RegisterViewState extends State<RegisterView> {
     if (widget.onRegister != null) {
       err = await widget.onRegister!(_username.text.trim(), _email.text.trim(), _password.text);
     } else {
-      err = AuthController.instance.register(
+      err = await AuthController.instance.signUp(
         username: _username.text.trim(),
         email: _email.text.trim(),
         password: _password.text,

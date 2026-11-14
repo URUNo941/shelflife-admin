@@ -19,6 +19,21 @@ class _UserMainViewState extends State<UserMainView> {
   int _index = 0;
 
   @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  /// ดึงของในตู้ของผู้ใช้ที่ล็อกอินจาก backend (โหมด test ไม่ทำอะไร)
+  Future<void> _load() async {
+    final error = await UserInventory.instance.load();
+    if (error != null && mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error)));
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFFCF8FF),
@@ -78,10 +93,13 @@ class UserHomeView extends StatelessWidget {
             .where((item) => item.isExpiringSoon)
             .fold<int>(0, (total, item) => total + item.qty);
         final fresh = totalQuantity - critical - soon;
+        // ของที่ยังไม่หมดอายุ แต่เป็นสีแดง/เหลือง = ควรใช้ก่อน
         final urgent = items
-            .where((item) => !item.isExpired && item.isExpiringSoon)
+            .where((item) =>
+                !item.isExpired && (item.isCritical || item.isExpiringSoon))
             .toList()
           ..sort((a, b) => a.expiry.compareTo(b.expiry));
+        final expiredBatches = items.where((item) => item.isExpired).length;
 
         return SingleChildScrollView(
           padding: const EdgeInsets.all(20),
@@ -91,7 +109,11 @@ class UserHomeView extends StatelessWidget {
               const Text('Welcome back,', style: TextStyle(color: Colors.grey)),
               const Text('My Shelf',
                   style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
+              // Smart Alert: เตือนทันทีที่เข้าแอปถ้ามีของหมดอายุ/ใกล้หมดอายุ
+              if (expiredBatches > 0 || urgent.isNotEmpty)
+                _SmartAlert(expired: expiredBatches, urgent: urgent.length),
+              const SizedBox(height: 4),
               GridView.count(
                 crossAxisCount: 2,
                 shrinkWrap: true,
@@ -182,6 +204,44 @@ class UserHomeView extends StatelessWidget {
               style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
         ],
       ),
+    );
+  }
+}
+
+/// แถบเตือนบนหน้า Home (Smart Alert) สีแดงถ้ามีของหมดอายุ ไม่งั้นสีเหลือง
+class _SmartAlert extends StatelessWidget {
+  final int expired;
+  final int urgent;
+  const _SmartAlert({required this.expired, required this.urgent});
+
+  @override
+  Widget build(BuildContext context) {
+    final danger = expired > 0;
+    final color = danger ? const Color(0xFFDC2626) : const Color(0xFFD97706);
+    final parts = [
+      if (expired > 0) '$expired batch${expired == 1 ? '' : 'es'} expired',
+      if (urgent > 0) '$urgent should be used soon',
+    ];
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Row(children: [
+        Icon(danger ? Icons.warning_amber_rounded : Icons.notifications_active_outlined,
+            color: color),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            parts.join(' · '),
+            style: TextStyle(color: color, fontWeight: FontWeight.w600),
+          ),
+        ),
+      ]),
     );
   }
 }

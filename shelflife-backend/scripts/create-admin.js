@@ -10,7 +10,7 @@ async function main() {
     console.error('Usage: node scripts/create-admin.js <username> <password>');
     process.exit(1);
   }
-  const hash = await argon2.hash(password);
+  const hash = await argon2.hash(password, { type: argon2.argon2id });
   const [rows] = await pool.query('SELECT user_id FROM users WHERE username = ?', [username]);
   if (rows.length) {
     await pool.query("UPDATE users SET password_hash = ?, role = 'admin' WHERE user_id = ?", [hash, rows[0].user_id]);

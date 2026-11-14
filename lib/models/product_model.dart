@@ -36,14 +36,15 @@ class ProductModel {
   factory ProductModel.fromJson(Map<String, dynamic> json) {
     return ProductModel(
       productId: json['product_id'] as int,
-      barcode: json['barcode'] as String,
+      // สินค้าที่ผู้ใช้เพิ่มเองโดยไม่มีบาร์โค้ด (เช่น ผักผลไม้) barcode เป็น null ได้
+      barcode: (json['barcode'] as String?) ?? '',
       productName: json['product_name'] as String,
       // ถ้า API ไม่ส่ง category มา ให้ใช้ 'General' กันแอปพัง
       category: (json['category'] as String?) ?? 'General',
       createdBy: json['created_by'] as int?, // `as int?` = รับค่า null ได้
       createdAt: json['created_at'] == null
           ? DateTime.now()
-          : DateTime.parse(json['created_at'] as String),
+          : DateTime.parse(json['created_at'] as String).toLocal(), // UTC -> เวลาเครื่อง
     );
   }
 

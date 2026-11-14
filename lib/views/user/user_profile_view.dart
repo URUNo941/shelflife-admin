@@ -4,6 +4,7 @@ import '../../controllers/auth_controller.dart';
 import '../../models/user_model.dart';
 import 'login_view.dart';
 import 'user_data.dart';
+import 'waste_stats_card.dart';
 
 /// หน้าบัญชีของฉัน: แสดงข้อมูลบัญชี + ปุ่ม Log out
 class UserProfileView extends StatelessWidget {
@@ -118,6 +119,8 @@ class UserProfileView extends StatelessWidget {
                       '$count'),
                 ]),
               ),
+              const SizedBox(height: 16),
+              const WasteStatsCard(),
               const SizedBox(height: 24),
               OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(

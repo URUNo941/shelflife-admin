@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../controllers/product_controller.dart';
+import '../../controllers/stats_controller.dart';
 import '../../controllers/user_controller.dart';
 
 class SystemAnalyticsView extends StatefulWidget {
@@ -10,16 +11,24 @@ class SystemAnalyticsView extends StatefulWidget {
 }
 
 class _SystemAnalyticsViewState extends State<SystemAnalyticsView> {
-  String selectedPeriod = 'This Month';
+  String selectedPeriod = 'All Time';
 
-  final _source = Listenable.merge(
-      [UserController.instance, ProductController.instance]);
+  final _source = Listenable.merge([
+    UserController.instance,
+    ProductController.instance,
+    StatsController.instance,
+  ]);
 
   @override
   void initState() {
     super.initState();
     _source.addListener(_refresh);
+    _loadPeriod();
   }
+
+  /// ดึงสถิติ Consumed vs Discarded ของช่วงเวลาที่เลือก (GET /api/stats/system)
+  Future<void> _loadPeriod() => StatsController.instance
+      .loadSystem(period: StatsController.periods[selectedPeriod]!);
 
   @override
   void dispose() {
@@ -31,20 +40,16 @@ class _SystemAnalyticsViewState extends State<SystemAnalyticsView> {
     if (mounted) setState(() {});
   }
 
-  static const _periodItemStats = {
-    'Today': {'active': 42, 'consumed': 6, 'discarded': 2},
-    'This Week': {'active': 302, 'consumed': 56, 'discarded': 22},
-    'This Month': {'active': 980, 'consumed': 180, 'discarded': 80},
-    'This Year': {'active': 1120, 'consumed': 245, 'discarded': 115},
-  };
-
   @override
   Widget build(BuildContext context) {
-    final itemStats = _periodItemStats[selectedPeriod]!;
-    final activeItems = itemStats['active']!;
-    final consumedItems = itemStats['consumed']!;
-    final discardedItems = itemStats['discarded']!;
+    // นับเป็นจำนวนล็อต: active = ยังอยู่ในตู้, consumed/discarded = เปลี่ยนสถานะในช่วงที่เลือก
+    final stats = StatsController.instance.system;
+    final activeItems = stats.active.batches;
+    final consumedItems = stats.consumed.batches;
+    final discardedItems = stats.discarded.batches;
     final totalItems = activeItems + consumedItems + discardedItems;
+    // กันหารด้วยศูนย์ตอนยังไม่มีข้อมูล
+    final divisor = totalItems == 0 ? 1 : totalItems;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -88,14 +93,11 @@ class _SystemAnalyticsViewState extends State<SystemAnalyticsView> {
                             setState(() {
                               selectedPeriod = newValue;
                             });
+                            _loadPeriod();
                           }
                         },
-                        items: <String>[
-                          'Today',
-                          'This Week',
-                          'This Month',
-                          'This Year'
-                        ].map<DropdownMenuItem<String>>((String value) {
+                        items: StatsController.periods.keys
+                            .map<DropdownMenuItem<String>>((String value) {
                           return DropdownMenuItem<String>(
                             value: value,
                             child: Text(value),
@@ -121,29 +123,31 @@ class _SystemAnalyticsViewState extends State<SystemAnalyticsView> {
                     icon: Icons.people_outline_rounded,
                     iconBgColor: const Color(0xFFDCFCE7),
                     iconColor: const Color(0xFF0D7A53),
-                    value: '${UserController.instance.users.length}',
+                    value:
+                        '${stats.totalUsers ?? UserController.instance.users.length}',
                     label: 'Total Users',
                   ),
                   _buildStatCard(
                     icon: Icons.qr_code_2_rounded,
                     iconBgColor: const Color(0xFFDCFCE7),
                     iconColor: const Color(0xFF0D7A53),
-                    value: '${ProductController.instance.products.length}',
+                    value:
+                        '${stats.totalProducts ?? ProductController.instance.products.length}',
                     label: 'Global Barcodes',
                   ),
                   _buildStatCard(
-                    icon: Icons.widgets_outlined,
+                    icon: Icons.recycling_rounded,
                     iconBgColor: const Color(0xFFFEF3C7),
                     iconColor: const Color(0xFFD97706),
-                    value: totalItems.toString(),
-                    label: 'Inventory Items',
+                    value: '${stats.wasteRate.toStringAsFixed(1)}%',
+                    label: 'Waste Rate (discarded / finished)',
                   ),
                   _buildStatCard(
                     icon: Icons.warning_amber_rounded,
                     iconBgColor: const Color(0xFFFEE2E2),
                     iconColor: const Color(0xFFDC2626),
-                    value: discardedItems.toString(),
-                    label: 'Expired Items',
+                    value: '${stats.expired.batches}',
+                    label: 'Expired Batches (still on shelves)',
                   ),
                 ],
               ),
@@ -173,9 +177,9 @@ class _SystemAnalyticsViewState extends State<SystemAnalyticsView> {
                         CustomPaint(
                           size: const Size(150, 150),
                           painter: DonutChartPainter(
-                            activeRatio: activeItems / totalItems,
-                            consumedRatio: consumedItems / totalItems,
-                            discardedRatio: discardedItems / totalItems,
+                            activeRatio: activeItems / divisor,
+                            consumedRatio: consumedItems / divisor,
+                            discardedRatio: discardedItems / divisor,
                           ),
                         ),
                         Column(
@@ -212,21 +216,21 @@ class _SystemAnalyticsViewState extends State<SystemAnalyticsView> {
                           color: const Color(0xFF10B981),
                           label: 'Active',
                           value:
-                              '$activeItems (${(activeItems * 100 / totalItems).round()}%)',
+                              '$activeItems (${(activeItems * 100 / divisor).round()}%)',
                         ),
                         const SizedBox(height: 16),
                         _buildLegendItem(
                           color: const Color(0xFFF59E0B),
                           label: 'Consumed',
                           value:
-                              '$consumedItems (${(consumedItems * 100 / totalItems).round()}%)',
+                              '$consumedItems (${(consumedItems * 100 / divisor).round()}%)',
                         ),
                         const SizedBox(height: 16),
                         _buildLegendItem(
                           color: const Color(0xFFEF4444),
                           label: 'Discarded',
                           value:
-                              '$discardedItems (${(discardedItems * 100 / totalItems).round()}%)',
+                              '$discardedItems (${(discardedItems * 100 / divisor).round()}%)',
                         ),
                       ],
                     ),

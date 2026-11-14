@@ -1,0 +1,76 @@
+### ShelfLife API demo (ใช้กับ VS Code extension "REST Client")
+### ก่อนใช้: XAMPP Start MySQL แล้วรัน `node server.js` ในโฟลเดอร์ shelflife-backend
+### กด "Send Request" ที่อยู่เหนือแต่ละคำขอ ผลจะเปิดทางขวา
+### ข้อ 1 สมัครสมาชิก -> ข้อ 2 login ได้ token แล้วคำขอถัดไปใช้ token ให้เอง
+
+@baseUrl = http://localhost:3000/api
+
+### 1) สมัครสมาชิก (role = user, รหัสผ่าน hash ด้วย argon2id)
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{ "username": "demo_user", "email": "demo@example.com", "password": "demo1234" }
+
+### 2) Login -> ได้ JWT
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{ "username": "demo_user", "password": "demo1234" }
+
+### 3) ไม่มี token -> 401 (ระบบกันไว้)
+GET {{baseUrl}}/items
+
+### 4) ของในตู้ของฉัน (เฉพาะ active)
+GET {{baseUrl}}/items
+Authorization: Bearer {{login.response.body.token}}
+
+### 5) Smart Barcode Auto-Fill: ค้นสินค้าจากบาร์โค้ด
+GET {{baseUrl}}/products/master/8850123456789
+
+### 6) เพิ่มของ: บาร์โค้ดมีอยู่แล้ว -> ใช้สินค้าเดิม ไม่สร้างซ้ำ
+# @name addItem
+POST {{baseUrl}}/items
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{
+  "barcode": "8850123456789",
+  "product_name": "Milk",
+  "category": "Food",
+  "quantity": 2,
+  "expiration_date": "2026-12-01"
+}
+
+### 7) Use one (ลดจำนวน)
+PUT {{baseUrl}}/items/{{addItem.response.body.item_id}}
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{ "quantity": 1 }
+
+### 8) Mark as consumed (หรือเปลี่ยนเป็น "discarded")
+PUT {{baseUrl}}/items/{{addItem.response.body.item_id}}
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{ "status": "consumed" }
+
+### 9) สถิติของฉัน: consumed vs discarded (period = today|week|month|year|all)
+GET {{baseUrl}}/stats/me?period=all
+Authorization: Bearer {{login.response.body.token}}
+
+### 10) ส่งค่าผิด -> 400
+PUT {{baseUrl}}/items/{{addItem.response.body.item_id}}
+Authorization: Bearer {{login.response.body.token}}
+Content-Type: application/json
+
+{ "status": "eaten" }
+
+### 11) user ธรรมดาเรียกหน้า admin -> 403
+GET {{baseUrl}}/users
+Authorization: Bearer {{login.response.body.token}}
+
+### 12) ลบล็อตที่เพิ่ม (สินค้าใน products ยังอยู่)
+DELETE {{baseUrl}}/items/{{addItem.response.body.item_id}}
+Authorization: Bearer {{login.response.body.token}}

@@ -10,10 +10,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const mysql = require('mysql2/promise');
 const jwt = require('jsonwebtoken');
+const argon2 = require('argon2');
 
 const backend = path.join(__dirname, '..');
 
-test('API works on the V2 database with the same JSON shape', { skip: !process.env.TEST_DB_HOST }, async (t) => {
+test('ShelfLife API on the V2 database', { skip: !process.env.TEST_DB_HOST }, async (t) => {
   const dbName = `shelflife_v2_apitest_${crypto.randomBytes(6).toString('hex')}`;
   const secret = crypto.randomBytes(24).toString('hex');
   const port = String(39000 + Math.floor(Math.random() * 1000));
@@ -56,7 +57,9 @@ test('API works on the V2 database with the same JSON shape', { skip: !process.e
     });
 
     const base = `http://127.0.0.1:${port}/api`;
-    const admin = jwt.sign({ userId: 1, role: 'admin' }, secret);
+    // Sample users: 1 = tom123 (admin, owns items 1-4), 2 = sarah (user, no items)
+    const adminToken = jwt.sign({ userId: 1, role: 'admin' }, secret);
+    const sarahToken = jwt.sign({ userId: 2, role: 'user' }, secret);
     const call = async (method, url, body, token) => {
       const res = await fetch(base + url, {
         method,
@@ -71,86 +74,170 @@ test('API works on the V2 database with the same JSON shape', { skip: !process.e
     };
     const sql = async (q, v = []) => (await root.query(q.replaceAll('DB', `\`${dbName}\``), v))[0];
 
-    await t.test('GET /items/:userId returns the fields Flutter reads', async () => {
-      const { status, body } = await call('GET', '/items/1');
+    let mintToken;
+    await t.test('register creates a user (argon2id hash) and returns a token', async () => {
+      const res = await call('POST', '/auth/register', { username: 'mint', email: 'Mint@Example.com', password: 'secret1' });
+      assert.equal(res.status, 201);
+      assert.ok(res.body.token);
+      assert.equal(res.body.user.role, 'user');
+      assert.equal(res.body.user.email, 'mint@example.com');
+      assert.equal('password_hash' in res.body.user, false);
+      const [row] = await sql("SELECT password_hash FROM DB.users WHERE username = 'mint'");
+      assert.match(row.password_hash, /^\$argon2id\$/);
+      mintToken = res.body.token;
+    });
+
+    await t.test('register validates input and rejects duplicates', async () => {
+      assert.equal((await call('POST', '/auth/register', { username: 'ab', email: 'a@b.co', password: 'secret1' })).status, 400);
+      assert.equal((await call('POST', '/auth/register', { username: 'abc', email: 'nope', password: 'secret1' })).status, 400);
+      assert.equal((await call('POST', '/auth/register', { username: 'abc', email: 'a@b.co', password: '123' })).status, 400);
+      assert.equal((await call('POST', '/auth/register', { username: 'mint', email: 'x@y.co', password: 'secret1' })).status, 409);
+    });
+
+    await t.test('login works with the right password only; role comes from the DB', async () => {
+      const ok = await call('POST', '/auth/login', { username: 'mint', password: 'secret1' });
+      assert.equal(ok.status, 200);
+      assert.equal(jwt.verify(ok.body.token, secret).role, 'user');
+      assert.equal((await call('POST', '/auth/login', { username: 'mint', password: 'wrong!!' })).status, 401);
+      // sample accounts have placeholder hashes: login fails cleanly instead of crashing
+      assert.equal((await call('POST', '/auth/login', { username: 'tom123', password: 'anything' })).status, 401);
+      const me = await call('GET', '/auth/me', undefined, mintToken);
+      assert.equal(me.body.username, 'mint');
+    });
+
+    await t.test('inventory requires a valid token', async () => {
+      assert.equal((await call('GET', '/items')).status, 401);
+      assert.equal((await call('GET', '/items', undefined, 'not-a-token')).status, 401);
+      const forged = jwt.sign({ userId: 1, role: 'admin' }, 'some-other-secret');
+      assert.equal((await call('GET', '/items', undefined, forged)).status, 401);
+    });
+
+    await t.test('GET /items returns only my active batches with the fields Flutter reads', async () => {
+      const { status, body } = await call('GET', '/items', undefined, adminToken);
       assert.equal(status, 200);
       assert.equal(body.length, 4);
-      for (const field of ['item_id', 'user_id', 'barcode', 'product_name', 'category', 'quantity', 'expiration_date', 'status'])
+      for (const field of ['item_id', 'user_id', 'barcode', 'product_name', 'category', 'quantity', 'expiration_date', 'status', 'created_at'])
         assert.ok(field in body[0], `missing ${field}`);
       const milk = body.find((i) => i.item_id === 1);
       assert.equal(milk.product_name, 'Fresh Milk 1L');
       assert.equal(milk.category, 'Food');
-      assert.equal(milk.barcode, '8850123456789');
-      // Plain date, not a UTC timestamp that shifts the day in Thailand.
-      assert.equal(milk.expiration_date, '2026-11-05');
+      assert.equal(milk.expiration_date, '2026-11-05'); // plain date, no UTC shift
+      assert.equal((await call('GET', '/items', undefined, sarahToken)).body.length, 0);
+      assert.equal((await call('GET', '/items?status=bogus', undefined, sarahToken)).status, 400);
     });
 
-    await t.test('POST /items with a known barcode reuses the product', async () => {
+    let sarahItem;
+    await t.test('POST /items: known barcode reuses the product, owner comes from the token', async () => {
       const { status, body } = await call('POST', '/items', {
-        user_id: 2, barcode: '8850123456789', product_name: 'Milk', category: 'Food', quantity: 3, expiration_date: '2026-12-01',
-      });
+        user_id: 1, barcode: '8850123456789', product_name: 'Milk', category: 'Food', quantity: 3, expiration_date: '2026-12-01',
+      }, sarahToken);
       assert.equal(status, 201);
-      assert.equal(body.message, 'Item added successfully');
-      const [row] = await sql('SELECT product_id FROM DB.inventory_items WHERE item_id = ?', [body.item_id]);
-      assert.equal(row.product_id, 1);
+      assert.equal(body.user_id, 2); // body.user_id is ignored
+      assert.equal(body.product_id, 1);
+      assert.equal(body.product_name, 'Fresh Milk 1L');
       assert.equal((await sql('SELECT COUNT(*) n FROM DB.products'))[0].n, 4);
+      sarahItem = body.item_id;
     });
 
     await t.test('POST /items without barcode shares one product and creates the category once', async () => {
-      const item = { user_id: 2, product_name: 'Bananas', category: 'Fruit', expiration_date: '2026-11-20' };
-      assert.equal((await call('POST', '/items', item)).status, 201);
-      assert.equal((await call('POST', '/items', { ...item, quantity: 2 })).status, 201);
+      const item = { product_name: 'Bananas', category: 'Fruit', expiration_date: '2026-11-20' };
+      assert.equal((await call('POST', '/items', item, sarahToken)).status, 201);
+      assert.equal((await call('POST', '/items', { ...item, quantity: 2 }, sarahToken)).status, 201);
       assert.equal((await sql("SELECT COUNT(*) n FROM DB.products WHERE product_name = 'Bananas'"))[0].n, 1);
       assert.equal((await sql("SELECT COUNT(*) n FROM DB.categories WHERE category_name = 'Fruit'"))[0].n, 1);
-      const list = (await call('GET', '/items/2')).body;
-      assert.equal(list.filter((i) => i.product_name === 'Bananas' && i.category === 'Fruit').length, 2);
+      assert.equal((await call('POST', '/items', { expiration_date: '2026-11-20' }, sarahToken)).status, 400);
+      assert.equal((await call('POST', '/items', { product_name: 'X', expiration_date: '2026-02-30' }, sarahToken)).status, 400);
     });
 
-    await t.test('POST /items without product_name is rejected', async () => {
-      assert.equal((await call('POST', '/items', { user_id: 2, expiration_date: '2026-11-20' })).status, 400);
+    await t.test('users cannot read, change or delete another user\'s batch', async () => {
+      assert.equal((await call('GET', '/items/1', undefined, sarahToken)).status, 404);
+      assert.equal((await call('PUT', '/items/1', { quantity: 9 }, sarahToken)).status, 404);
+      assert.equal((await call('DELETE', '/items/1', undefined, sarahToken)).status, 404);
+      assert.equal((await sql('SELECT quantity FROM DB.inventory_items WHERE item_id = 1'))[0].quantity, 2);
     });
 
-    await t.test('PUT /items/:id records when the status changed', async () => {
-      assert.equal((await call('PUT', '/items/2', { status: 'consumed' })).status, 200);
-      const [row] = await sql('SELECT status, status_updated_at FROM DB.inventory_items WHERE item_id = 2');
-      assert.equal(row.status, 'consumed');
-      assert.notEqual(row.status_updated_at, null);
-      assert.equal((await call('PUT', '/items/2', { status: 'eaten' })).status, 400);
+    await t.test('PUT /items/:id edits quantity, expiry and product; status records its time', async () => {
+      const edited = await call('PUT', `/items/${sarahItem}`, { quantity: 2, expiration_date: '2026-12-05' }, sarahToken);
+      assert.equal(edited.status, 200);
+      assert.equal(edited.body.quantity, 2);
+      assert.equal(edited.body.expiration_date, '2026-12-05');
+      const consumed = await call('PUT', `/items/${sarahItem}`, { status: 'consumed' }, sarahToken);
+      assert.equal(consumed.body.status, 'consumed');
+      assert.notEqual(consumed.body.status_updated_at, null);
+      assert.equal((await call('PUT', `/items/${sarahItem}`, { status: 'eaten' }, sarahToken)).status, 400);
+      assert.equal((await call('PUT', `/items/${sarahItem}`, { quantity: 0 }, sarahToken)).status, 400);
+      const active = (await call('GET', '/items', undefined, sarahToken)).body;
+      assert.equal(active.some((i) => i.item_id === sarahItem), false);
+      const all = (await call('GET', '/items?status=all', undefined, sarahToken)).body;
+      assert.equal(all.some((i) => i.item_id === sarahItem), true);
     });
 
-    await t.test('DELETE /items/:id removes the batch but keeps the product', async () => {
-      assert.equal((await call('DELETE', '/items/3')).status, 200);
-      assert.equal((await sql('SELECT COUNT(*) n FROM DB.inventory_items WHERE item_id = 3'))[0].n, 0);
-      assert.equal((await sql('SELECT COUNT(*) n FROM DB.products WHERE product_id = 3'))[0].n, 1);
+    await t.test('stats count consumed vs discarded for me and for the whole system', async () => {
+      const bananas = (await call('GET', '/items', undefined, sarahToken)).body.filter((i) => i.product_name === 'Bananas');
+      await call('PUT', `/items/${bananas[0].item_id}`, { status: 'discarded' }, sarahToken);
+      const mine = await call('GET', '/stats/me?period=today', undefined, sarahToken);
+      assert.equal(mine.status, 200);
+      assert.equal(mine.body.consumed.batches, 1);
+      assert.equal(mine.body.discarded.batches, 1);
+      assert.equal(mine.body.active.batches, 1);
+      assert.equal(mine.body.waste_rate, 50);
+      assert.deepEqual(mine.body.top_discarded_categories, [{ category: 'Fruit', batches: 1 }]);
+      assert.equal((await call('GET', '/stats/me?period=decade', undefined, sarahToken)).status, 400);
+      assert.equal((await call('GET', '/stats/system', undefined, sarahToken)).status, 403);
+      const system = await call('GET', '/stats/system?period=all', undefined, adminToken);
+      assert.equal(system.status, 200);
+      assert.equal(system.body.total_users, 3);
+      assert.equal(system.body.total_products, 5);
+      assert.equal(system.body.active.batches, 5);
+      // tom123's sample batches expire before today's date in this test run? count only checks the shape
+      assert.equal(typeof system.body.expired.batches, 'number');
     });
 
-    await t.test('product endpoints return category by name', async () => {
-      const list = await call('GET', '/products');
-      assert.equal(list.status, 200);
-      assert.ok(list.body.every((p) => typeof p.category === 'string'));
+    await t.test('DELETE /items/:id removes my batch but keeps the product', async () => {
+      assert.equal((await call('DELETE', `/items/${sarahItem}`, undefined, sarahToken)).status, 204);
+      assert.equal((await sql('SELECT COUNT(*) n FROM DB.inventory_items WHERE item_id = ?', [sarahItem]))[0].n, 0);
+      assert.equal((await sql('SELECT COUNT(*) n FROM DB.products WHERE product_id = 1'))[0].n, 1);
+    });
+
+    await t.test('barcode auto-fill lookup returns name and category', async () => {
       const byCode = await call('GET', '/products/master/8850111222333');
       assert.equal(byCode.status, 200);
+      assert.equal(byCode.body.product_name, 'Paracetamol 500mg (10s)');
       assert.equal(byCode.body.category, 'Medicine');
       assert.equal((await call('GET', '/products/master/0000')).status, 404);
     });
 
-    await t.test('admin can create, update and delete products; in-use products are protected', async () => {
-      const created = await call('POST', '/products', { barcode: 'TEST-1', product_name: 'Test soap', category: 'Household' }, admin);
+    await t.test('admin manages the catalog; users cannot; in-use products are protected', async () => {
+      assert.equal((await call('POST', '/products', { barcode: '111', product_name: 'Y' }, sarahToken)).status, 403);
+      const created = await call('POST', '/products', { barcode: '5550001', product_name: 'Test soap', category: 'Household' }, adminToken);
       assert.equal(created.status, 201);
       assert.equal(created.body.category, 'Household');
-      const updated = await call('PUT', `/products/${created.body.product_id}`, { category: 'Food' }, admin);
-      assert.equal(updated.status, 200);
-      assert.equal(updated.body.category, 'Food');
-      assert.equal((await call('DELETE', '/products/1', undefined, admin)).status, 409);
-      assert.equal((await call('DELETE', `/products/${created.body.product_id}`, undefined, admin)).status, 204);
-      assert.equal((await call('POST', '/products', { barcode: 'X', product_name: 'Y' })).status, 401);
+      const updated = await call('PUT', `/products/${created.body.product_id}`, { category: 'Other' }, adminToken);
+      assert.equal(updated.body.category, 'Other');
+      assert.equal((await call('POST', '/products', { barcode: '5550001', product_name: 'Dup' }, adminToken)).status, 409);
+      assert.equal((await call('DELETE', '/products/1', undefined, adminToken)).status, 409);
+      assert.equal((await call('DELETE', `/products/${created.body.product_id}`, undefined, adminToken)).status, 204);
     });
 
-    await t.test('admin user endpoints respond (no hanging queries)', async () => {
-      const users = await call('GET', '/users', undefined, admin);
-      assert.equal(users.status, 200);
-      assert.equal(users.body.length, 2);
-      assert.equal('password_hash' in users.body[0], false);
+    await t.test('admin manages users; last admin and self are protected', async () => {
+      assert.equal((await call('GET', '/users', undefined, sarahToken)).status, 403);
+      const list = await call('GET', '/users', undefined, adminToken);
+      assert.equal(list.status, 200);
+      assert.equal('password_hash' in list.body[0], false);
+      const created = await call('POST', '/users', { username: 'newbie', password: 'secret1', role: 'user' }, adminToken);
+      assert.equal(created.status, 201);
+      const promoted = await call('PUT', `/users/${created.body.user_id}`, { role: 'admin' }, adminToken);
+      assert.equal(promoted.body.role, 'admin');
+      assert.equal((await call('PUT', '/users/1', { role: 'user' }, adminToken)).status, 400); // self
+      assert.equal((await call('DELETE', '/users/1', undefined, adminToken)).status, 400); // self
+      assert.equal((await call('DELETE', `/users/${created.body.user_id}`, undefined, adminToken)).status, 204);
+      // only one admin left (tom123): demoting it from another admin token is refused
+      const hash = await argon2.hash('secret1', { type: argon2.argon2id });
+      await sql("INSERT INTO DB.users (username, password_hash, role) VALUES ('helper', ?, 'user')", [hash]);
+      const [helper] = await sql("SELECT user_id FROM DB.users WHERE username = 'helper'");
+      const helperAdmin = jwt.sign({ userId: helper.user_id, role: 'admin' }, secret);
+      assert.equal((await call('PUT', '/users/1', { role: 'user' }, helperAdmin)).status, 400);
+      assert.equal((await call('DELETE', '/users/1', undefined, helperAdmin)).status, 400);
     });
   } finally {
     if (server) server.kill();

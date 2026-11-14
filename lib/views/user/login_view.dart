@@ -21,26 +21,30 @@ class _LoginViewState extends State<LoginView> {
   bool _obscurePassword = true;
   bool _rememberMe = false;
 
-  void _handleLogin() {
-    if (!_formKey.currentState!.validate()) return;
+  bool _loading = false;
 
-    final user = AuthController.instance.login(
+  Future<void> _handleLogin() async {
+    if (!_formKey.currentState!.validate() || _loading) return;
+
+    setState(() => _loading = true);
+    final error = await AuthController.instance.signIn(
       _emailController.text.trim(),
       _passwordController.text,
     );
-    final Widget? destination = user == null
-        ? null
-        : user.isAdmin
-            ? const AdminMainView()
-            : const UserMainView();
+    if (!mounted) return;
+    setState(() => _loading = false);
 
-    if (destination == null) {
+    final user = AuthController.instance.currentUser;
+    if (error != null || user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid username or password')),
+        SnackBar(content: Text(error ?? 'Invalid username or password')),
       );
       return;
     }
 
+    // เลือกหน้าตาม role ที่ได้จาก backend (role-based)
+    final Widget destination =
+        user.isAdmin ? const AdminMainView() : const UserMainView();
     Navigator.pushReplacement(
       context,
       MaterialPageRoute<void>(builder: (_) => destination),

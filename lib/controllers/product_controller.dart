@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/mock_data.dart';
 import '../models/product_model.dart';
+import '../services/api_client.dart';
 
 /// Controller จัดการ Master Barcode Catalog เก็บข้อมูลในหน่วยความจำ
 class ProductController extends ChangeNotifier {
@@ -128,6 +129,117 @@ class ProductController extends ChangeNotifier {
     final removed = _products.length != before;
     if (removed) notifyListeners();
     return removed;
+  }
+
+  // ---------------------------------------------------------------------------
+  // เวอร์ชัน async ที่หน้าจอเรียก: ถ้าเปิด API จะไปที่ /api/products
+  // ---------------------------------------------------------------------------
+  ApiClient get _api => ApiClient.instance;
+  bool get _online => _api.enabled;
+
+  Future<String?> load() async {
+    if (!_online) return null;
+    try {
+      final rows = await _api.get('/products') as List;
+      _products
+        ..clear()
+        ..addAll(rows.map((r) => ProductModel.fromJson(r as Map<String, dynamic>)));
+      notifyListeners();
+      return null;
+    } on ApiException catch (e) {
+      return e.message;
+    }
+  }
+
+  /// Smart Barcode Auto-Fill: หาสินค้าจากบาร์โค้ด (GET /api/products/master/:barcode)
+  Future<ProductModel?> lookup(String barcode) async {
+    final code = barcode.trim();
+    if (code.isEmpty) return null;
+    if (!_online) return findByBarcode(code);
+    try {
+      final row = await _api.get('/products/master/${Uri.encodeComponent(code)}');
+      return ProductModel.fromJson(row as Map<String, dynamic>);
+    } on ApiException {
+      return null; // 404 = ยังไม่มีในแคตตาล็อก ผู้ใช้กรอกเองได้
+    }
+  }
+
+  Future<String?> create({
+    required String barcode,
+    required String productName,
+    String category = 'General',
+    int? createdBy,
+  }) async {
+    if (!_online) {
+      return add(
+          barcode: barcode,
+          productName: productName,
+          category: category,
+          createdBy: createdBy);
+    }
+    final error = _validate(barcode, productName);
+    if (error != null) return error;
+    try {
+      final row = await _api.post('/products', {
+        'barcode': barcode.trim(),
+        'product_name': productName.trim(),
+        'category': category,
+      });
+      _products.add(ProductModel.fromJson(row as Map<String, dynamic>));
+      notifyListeners();
+      return null;
+    } on ApiException catch (e) {
+      return e.message;
+    }
+  }
+
+  Future<String?> edit(
+    int productId, {
+    required String barcode,
+    required String productName,
+    required String category,
+  }) async {
+    if (!_online) {
+      return update(productId,
+          barcode: barcode, productName: productName, category: category);
+    }
+    final error = _validate(barcode, productName, excludingId: productId);
+    if (error != null) return error;
+    try {
+      final row = await _api.put('/products/$productId', {
+        'barcode': barcode.trim(),
+        'product_name': productName.trim(),
+        'category': category,
+      });
+      final index = _products.indexWhere((p) => p.productId == productId);
+      if (index >= 0) {
+        _products[index] = ProductModel.fromJson(row as Map<String, dynamic>);
+      }
+      notifyListeners();
+      return null;
+    } on ApiException catch (e) {
+      return e.message;
+    }
+  }
+
+  /// คืน null ถ้าลบสำเร็จ หรือข้อความ error (เช่น สินค้ายังมีคนเก็บไว้ในตู้)
+  Future<String?> remove(int productId) async {
+    if (!_online) return delete(productId) ? null : 'Product not found';
+    try {
+      await _api.delete('/products/$productId');
+      _products.removeWhere((p) => p.productId == productId);
+      notifyListeners();
+      return null;
+    } on ApiException catch (e) {
+      return e.statusCode == 409
+          ? 'This product is still in someone\'s inventory, so it cannot be deleted.'
+          : e.message;
+    }
+  }
+
+  void clearCache() {
+    _products.clear();
+    notifyListeners();
   }
 
   void reset() {

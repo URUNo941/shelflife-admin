@@ -86,15 +86,24 @@ class _UserItemFormViewState extends State<UserItemFormView> {
     _fillFromCatalog(code);
   }
 
-  /// ถ้า barcode อยู่ใน Master Catalog และยังไม่ได้กรอกชื่อ ให้เติมชื่อ/หมวดหมู่ให้
-  void _fillFromCatalog(String code) {
+  /// Smart Barcode Auto-Fill: ถ้า barcode อยู่ใน Master Catalog และยังไม่ได้กรอกชื่อ
+  /// ให้เติมชื่อ/หมวดหมู่ให้อัตโนมัติ (ถาม backend: GET /api/products/master/:barcode)
+  Future<void> _fillFromCatalog(String code) async {
+    if (_name.text.trim().isNotEmpty || code.trim().isEmpty) return;
+    final product = await ProductController.instance.lookup(code);
+    // ผู้ใช้อาจพิมพ์ต่อระหว่างรอ: ใช้ผลเฉพาะเมื่อ barcode ยังเป็นค่าเดิม
+    if (product == null || !mounted || _barcode.text.trim() != code.trim()) {
+      return;
+    }
     if (_name.text.trim().isNotEmpty) return;
-    final product = ProductController.instance.findByBarcode(code);
-    if (product == null) return;
     setState(() {
       _name.text = product.productName;
-      if (kCategories.contains(product.category)) _category = product.category;
+      _category = product.category;
     });
+  }
+
+  void _showError(String error) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
   }
 
   Future<void> _pickDate() async {
@@ -158,14 +167,19 @@ class _UserItemFormViewState extends State<UserItemFormView> {
       if (choice == 'merge') mergeInto = matchingBatch;
     }
 
-    inv.save(candidate, replacing: oldItem, mergeInto: mergeInto);
+    final error =
+        await inv.saveItem(candidate, replacing: oldItem, mergeInto: mergeInto);
+    if (!mounted) return;
+    if (error != null) return _showError(error);
     Navigator.pop(context);
   }
 
   Future<void> _delete() async {
     final item = widget.item!;
     if (await confirmDeleteItem(context, item) && mounted) {
-      UserInventory.instance.remove(item.id);
+      final error = await UserInventory.instance.deleteItem(item.id);
+      if (!mounted) return;
+      if (error != null) return _showError(error);
       Navigator.pop(context);
     }
   }
@@ -216,7 +230,11 @@ class _UserItemFormViewState extends State<UserItemFormView> {
                 initialValue: _category,
                 decoration: const InputDecoration(
                     labelText: 'Category *', border: OutlineInputBorder()),
-                items: kCategories
+                // หมวดจากแคตตาล็อกอาจไม่อยู่ใน 3 หมวดหลัก (เช่น Fruit) ก็ให้เลือกได้
+                items: [
+                  ...kCategories,
+                  if (!kCategories.contains(_category)) _category,
+                ]
                     .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                     .toList(),
                 onChanged: (v) => setState(() => _category = v ?? _category),
