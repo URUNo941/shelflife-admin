@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../controllers/auth_controller.dart';
 import '../admin/admin_main_view.dart';
 import 'user_main_view.dart';
 import 'package:myapp/views/register_view.dart';
@@ -23,13 +24,15 @@ class _LoginViewState extends State<LoginView> {
   void _handleLogin() {
     if (!_formKey.currentState!.validate()) return;
 
-    final username = _emailController.text.trim().toLowerCase();
-    final password = _passwordController.text;
-    final Widget? destination = switch ((username, password)) {
-      ('admin', '1234') => const AdminMainView(),
-      ('user', '1234') => const UserMainView(),
-      _ => null,
-    };
+    final user = AuthController.instance.login(
+      _emailController.text.trim(),
+      _passwordController.text,
+    );
+    final Widget? destination = user == null
+        ? null
+        : user.isAdmin
+            ? const AdminMainView()
+            : const UserMainView();
 
     if (destination == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -66,7 +69,7 @@ class _LoginViewState extends State<LoginView> {
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 15,
                   offset: const Offset(0, 5),
                 ),
@@ -84,10 +87,11 @@ class _LoginViewState extends State<LoginView> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: primaryGreen.withOpacity(0.1),
+                            color: primaryGreen.withValues(alpha: 0.1),
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(Icons.store, size: 48, color: primaryGreen),
+                          child:
+                              Icon(Icons.store, size: 48, color: primaryGreen),
                         ),
                         const SizedBox(height: 16),
                         const Text(
@@ -101,7 +105,8 @@ class _LoginViewState extends State<LoginView> {
                         const SizedBox(height: 6),
                         Text(
                           'Sign in to access your dashboard',
-                          style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                          style:
+                              TextStyle(fontSize: 13, color: Colors.grey[600]),
                         ),
                       ],
                     ),
@@ -151,7 +156,9 @@ class _LoginViewState extends State<LoginView> {
                       prefixIcon: const Icon(Icons.lock_outline, size: 20),
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                          _obscurePassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
                           size: 20,
                           color: Colors.grey,
                         ),
@@ -181,8 +188,10 @@ class _LoginViewState extends State<LoginView> {
                     },
                   ),
                   const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    runSpacing: 4,
                     children: [
                       Row(
                         children: [
@@ -200,16 +209,20 @@ class _LoginViewState extends State<LoginView> {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          const Text('Remember me', style: TextStyle(fontSize: 13)),
+                          const Text('Remember me',
+                              style: TextStyle(fontSize: 13)),
                         ],
                       ),
-                      TextButton(
-                        onPressed: () {},
-                        child: Text(
-                          'Forgot password?',
-                          style: TextStyle(color: primaryGreen, fontSize: 13, fontWeight: FontWeight.bold),
-                        ),
-                      ),
+                      // TextButton(
+                      //   onPressed: () {},
+                      //   child: Text(
+                      //     'Forgot password?',
+                      //     style: TextStyle(
+                      //         color: primaryGreen,
+                      //         fontSize: 13,
+                      //         fontWeight: FontWeight.bold),
+                      //   ),
+                      // ),
                     ],
                   ),
                   const SizedBox(height: 24),
@@ -228,23 +241,30 @@ class _LoginViewState extends State<LoginView> {
                       onPressed: _handleLogin,
                       child: const Text(
                         'Sign In',
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
                   const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      const Text("Don't have an account?", style: TextStyle(fontSize: 13)),
+                      const Text("Don't have an account?",
+                          style: TextStyle(fontSize: 13)),
                       TextButton(
                         onPressed: () => Navigator.push(
                           context,
-                          MaterialPageRoute<void>(builder: (_) => const RegisterView()),
+                          MaterialPageRoute<void>(
+                              builder: (_) => const RegisterView()),
                         ),
                         child: Text(
                           'Sign Up',
-                          style: TextStyle(color: primaryGreen, fontSize: 13, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                              color: primaryGreen,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold),
                         ),
                       ),
                     ],
@@ -257,13 +277,4 @@ class _LoginViewState extends State<LoginView> {
       ),
     );
   }
-}
-
-void main() {
-  runApp(
-    const MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: LoginView(),
-    ),
-  );
 }
