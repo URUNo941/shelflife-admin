@@ -1,10 +1,20 @@
-
 import 'package:flutter/material.dart';
+
+import '../../controllers/user_controller.dart';
+import '../../models/user_model.dart';
+import '../../services/api_client.dart';
 
 class UserManagementView extends StatefulWidget {
   final VoidCallback? onBackToDashboard;
 
-  const UserManagementView({super.key, this.onBackToDashboard});
+  /// ถ้าไม่ส่งมา ใช้ [UserController.instance]
+  final UserController? controller;
+
+  const UserManagementView({
+    super.key,
+    this.onBackToDashboard,
+    this.controller,
+  });
 
   @override
   State<UserManagementView> createState() => _UserManagementViewState();
@@ -14,52 +24,63 @@ class _UserManagementViewState extends State<UserManagementView> {
   String searchQuery = '';
   String selectedRole = 'All';
 
-  // Mock data รายชื่อผู้ใช้
-  final List<Map<String, String>> usersList = [
-    {'username': 'tom123', 'role': 'Admin', 'joinedDate': 'Oct 1, 2026'},
-    {'username': 'sarah', 'role': 'User', 'joinedDate': 'Oct 5, 2026'},
-    {'username': 'john', 'role': 'User', 'joinedDate': 'Oct 10, 2026'},
-    {'username': 'patlee', 'role': 'User', 'joinedDate': 'Oct 12, 2026'},
-    {'username': 'natsirin', 'role': 'User', 'joinedDate': 'Oct 15, 2026'},
-    {'username': 'ployk', 'role': 'User', 'joinedDate': 'Oct 18, 2026'},
-    {'username': 'winm', 'role': 'User', 'joinedDate': 'Oct 20, 2026'},
-  ];
+  late final UserController _users =
+      widget.controller ?? UserController.instance;
 
-  Future<Map<String, String>?> _showUserEditor({
-    Map<String, String>? user,
-  }) async {
-    final usernameController = TextEditingController(
-      text: user?['username'] ?? '',
-    );
+  @override
+  void initState() {
+    super.initState();
+    _users.addListener(_onUsersChanged);
+  }
+
+  @override
+  void dispose() {
+    _users.removeListener(_onUsersChanged);
+    super.dispose();
+  }
+
+  void _onUsersChanged() {
+    if (mounted) setState(() {});
+  }
+
+  Future<Map<String, String>?> _showUserEditor({UserModel? user}) async {
     final formKey = GlobalKey<FormState>();
-    var role = user?['role'] ?? 'User';
+    var username = user?.username ?? '';
+    var password = '';
+    var role = user?.roleLabel ?? 'User';
+    // แอปจริง: backend ต้องมีรหัสผ่านตอนสร้างผู้ใช้ (hash ด้วย argon2id ที่ server)
+    final needsPassword = user == null && ApiClient.instance.enabled;
     final result = await showDialog<Map<String, String>>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Text(user == null ? 'Add user' : 'Edit user'),
+          title: Text(user == null ? 'Add user' : 'Edit role'),
           content: Form(
             key: formKey,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextFormField(
-                  controller: usernameController,
-                  autofocus: true,
-                  decoration: const InputDecoration(labelText: 'Username'),
-                  validator: (value) {
-                    final username = value?.trim() ?? '';
-                    if (username.isEmpty) return 'Enter a username';
-                    final alreadyExists = usersList.any(
-                      (existingUser) =>
-                          existingUser != user &&
-                          (existingUser['username'] ?? '').toLowerCase() ==
-                              username.toLowerCase(),
-                    );
-                    if (alreadyExists) return 'Username already exists';
-                    return null;
-                  },
-                ),
+                if (user == null)
+                  TextFormField(
+                    initialValue: username,
+                    autofocus: true,
+                    decoration: const InputDecoration(labelText: 'Username'),
+                    onChanged: (value) => username = value,
+                    validator: (value) =>
+                        _users.validateNewUsername(value ?? ''),
+                  ),
+                if (needsPassword) ...[
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    obscureText: true,
+                    decoration:
+                        const InputDecoration(labelText: 'Temporary password'),
+                    onChanged: (value) => password = value,
+                    validator: (value) => (value ?? '').length < 6
+                        ? 'At least 6 characters'
+                        : null,
+                  ),
+                ],
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   initialValue: role,
@@ -86,10 +107,9 @@ class _UserManagementViewState extends State<UserManagementView> {
               onPressed: () {
                 if (!formKey.currentState!.validate()) return;
                 Navigator.pop(context, {
-                  'username': usernameController.text.trim(),
+                  'username': username.trim(),
+                  'password': password,
                   'role': role,
-                  'joinedDate': user?['joinedDate'] ??
-                      DateTime.now().toLocal().toString().split(' ').first,
                 });
               },
               child: Text(user == null ? 'Add' : 'Save'),
@@ -98,31 +118,29 @@ class _UserManagementViewState extends State<UserManagementView> {
         ),
       ),
     );
-    usernameController.dispose();
     return result;
   }
 
   Future<void> _addUser() async {
     final user = await _showUserEditor();
     if (user == null) return;
-    setState(() => usersList.add(user));
-    _showMessage('User added');
+    final error = await _users.create(
+      username: user['username']!,
+      role: user['role']!,
+      password: user['password'] ?? '',
+    );
+    if (mounted) _showMessage(error ?? 'User added');
   }
 
-  Future<void> _editUser(Map<String, String> user) async {
+  Future<void> _editUser(UserModel user) async {
     final updatedUser = await _showUserEditor(user: user);
     if (updatedUser == null) return;
-    setState(() {
-      user
-        ..clear()
-        ..addAll(updatedUser);
-    });
-    _showMessage('User updated');
+    final error = await _users.setRole(user.userId, updatedUser['role']!);
+    if (mounted) _showMessage(error ?? 'User updated');
   }
 
-  Future<void> _deleteUser(Map<String, String> user) async {
-    if (user['role'] == 'Admin' &&
-        usersList.where((entry) => entry['role'] == 'Admin').length == 1) {
+  Future<void> _deleteUser(UserModel user) async {
+    if (user.isAdmin && _users.adminCount == 1) {
       _showMessage('The last administrator cannot be deleted');
       return;
     }
@@ -131,7 +149,7 @@ class _UserManagementViewState extends State<UserManagementView> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete user?'),
-        content: Text('Remove ${user['username']} from user management?'),
+        content: Text('Remove ${user.username} from user management?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -146,8 +164,8 @@ class _UserManagementViewState extends State<UserManagementView> {
       ),
     );
     if (shouldDelete == true) {
-      setState(() => usersList.remove(user));
-      _showMessage('User deleted');
+      final error = await _users.remove(user.userId);
+      if (mounted) _showMessage(error ?? 'User deleted');
     }
   }
 
@@ -185,14 +203,8 @@ class _UserManagementViewState extends State<UserManagementView> {
 
   @override
   Widget build(BuildContext context) {
-    final filteredUsers = usersList.where((u) {
-      final matchesSearch =
-          ('${u['username']} ${u['role']}')
-              .toLowerCase()
-              .contains(searchQuery.toLowerCase());
-      final matchesRole = selectedRole == 'All' || u['role'] == selectedRole;
-      return matchesSearch && matchesRole;
-    }).toList();
+    final filteredUsers =
+        _users.search(query: searchQuery, role: selectedRole);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -397,7 +409,7 @@ class _UserManagementViewState extends State<UserManagementView> {
                         },
                         itemBuilder: (context, index) {
                           final user = filteredUsers[index];
-                          final isAdmin = user['role'] == 'Admin';
+                          final isAdmin = user.isAdmin;
 
                           return Container(
                             padding: const EdgeInsets.symmetric(
@@ -411,7 +423,7 @@ class _UserManagementViewState extends State<UserManagementView> {
                                 Expanded(
                                   flex: 3,
                                   child: Text(
-                                    user['username'] ?? '',
+                                    user.username,
                                     style: const TextStyle(
                                       fontWeight: FontWeight.w600,
                                       fontSize: 14,
@@ -437,7 +449,7 @@ class _UserManagementViewState extends State<UserManagementView> {
                                         borderRadius: BorderRadius.circular(20),
                                       ),
                                       child: Text(
-                                        user['role'] ?? '',
+                                        user.roleLabel,
                                         style: TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.bold,
@@ -454,7 +466,7 @@ class _UserManagementViewState extends State<UserManagementView> {
                                 Expanded(
                                   flex: 3,
                                   child: Text(
-                                    user['joinedDate'] ?? '',
+                                    user.joinedLabel,
                                     style: TextStyle(
                                       fontSize: 13,
                                       color: Colors.grey.shade600,

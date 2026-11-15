@@ -1,5 +1,8 @@
-
 import 'package:flutter/material.dart';
+import '../../controllers/auth_controller.dart';
+import '../../controllers/product_controller.dart';
+import '../../controllers/user_controller.dart';
+import '../../controllers/stats_controller.dart';
 import '../user/login_view.dart' show LoginView;
 
 class AdminDashboardView extends StatelessWidget {
@@ -9,6 +12,27 @@ class AdminDashboardView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // ตัวเลขบนการ์ดอัปเดตตามข้อมูลใน controller
+    return ListenableBuilder(
+      listenable: Listenable.merge([
+        UserController.instance,
+        ProductController.instance,
+        StatsController.instance,
+      ]),
+      builder: (context, _) => _buildContent(context),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
+    // ตัวเลขทั้งระบบจาก GET /api/stats/system (ทุกผู้ใช้ ไม่ใช่แค่ตู้ของ admin)
+    final system = StatsController.instance.system;
+    final totalUsers = system.totalUsers ?? UserController.instance.users.length;
+    final totalBarcodes =
+        system.totalProducts ?? ProductController.instance.products.length;
+    final inventoryItems = system.active.quantity;
+    final expiredItems = system.expired.batches;
+    final adminName = AuthController.instance.currentUser?.username ?? 'Admin';
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20.0),
       child: Column(
@@ -73,29 +97,32 @@ class AdminDashboardView extends StatelessWidget {
               Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.notifications_none_rounded, size: 28),
+                    icon:
+                        const Icon(Icons.notifications_none_rounded, size: 28),
                     onPressed: () {
                       showDialog<void>(
                         context: context,
                         builder: (context) => AlertDialog(
                           title: const Text('Notifications'),
-                          content: const Column(
+                          content: Column(
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               ListTile(
                                 contentPadding: EdgeInsets.zero,
-                                leading: Icon(Icons.warning_amber_rounded,
+                                leading: const Icon(Icons.warning_amber_rounded,
                                     color: Colors.orange),
-                                title: Text('42 items are expired'),
-                                subtitle: Text('Review inventory status'),
+                                title: Text(
+                                    '$expiredItems batch${expiredItems == 1 ? ' is' : 'es are'} expired'),
+                                subtitle: const Text('Review inventory status'),
                               ),
-                              ListTile(
+                              const ListTile(
                                 contentPadding: EdgeInsets.zero,
                                 leading: Icon(Icons.person_add_alt_1,
                                     color: Color(0xFF0D7A53)),
                                 title: Text('New users this month'),
-                                subtitle: Text('Check the user management page'),
+                                subtitle:
+                                    Text('Check the user management page'),
                               ),
                             ],
                           ),
@@ -118,16 +145,16 @@ class AdminDashboardView extends StatelessWidget {
                           context: context,
                           builder: (context) => AlertDialog(
                             title: const Text('Admin profile'),
-                            content: const ListTile(
+                            content: ListTile(
                               contentPadding: EdgeInsets.zero,
                               leading: CircleAvatar(
-                                backgroundColor: Color(0xFFDCFCE7),
-                                child: Text('A',
-                                    style: TextStyle(
+                                backgroundColor: const Color(0xFFDCFCE7),
+                                child: Text(adminName[0].toUpperCase(),
+                                    style: const TextStyle(
                                         color: Color(0xFF0D7A53))),
                               ),
-                              title: Text('Admin'),
-                              subtitle: Text('Administrator account'),
+                              title: Text(adminName),
+                              subtitle: const Text('Administrator account'),
                             ),
                             actions: [
                               TextButton(
@@ -136,8 +163,7 @@ class AdminDashboardView extends StatelessWidget {
                               ),
                               FilledButton.icon(
                                 onPressed: () async {
-                                  final shouldLogout =
-                                      await showDialog<bool>(
+                                  final shouldLogout = await showDialog<bool>(
                                     context: context,
                                     builder: (context) => AlertDialog(
                                       title: const Text('Log out?'),
@@ -162,6 +188,7 @@ class AdminDashboardView extends StatelessWidget {
                                       !context.mounted) {
                                     return;
                                   }
+                                  AuthController.instance.logout();
                                   Navigator.of(context).pushAndRemoveUntil(
                                     MaterialPageRoute<void>(
                                       builder: (_) => const LoginView(),
@@ -212,16 +239,22 @@ class AdminDashboardView extends StatelessWidget {
           // Title Section
           const Text(
             'Admin Console',
-            style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.black87),
+            style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87),
           ),
           const SizedBox(height: 4),
           Text(
             'Welcome back,',
             style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
           ),
-          const Text(
-            'Admin',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+          Text(
+            adminName,
+            style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87),
           ),
           const SizedBox(height: 24),
 
@@ -238,28 +271,28 @@ class AdminDashboardView extends StatelessWidget {
                 icon: Icons.people_outline_rounded,
                 iconBgColor: const Color(0xFFDCFCE7),
                 iconColor: const Color(0xFF0D7A53),
-                value: '128',
+                value: '$totalUsers',
                 label: 'Total Users',
               ),
               _buildStatCard(
                 icon: Icons.qr_code_2_rounded,
                 iconBgColor: const Color(0xFFDCFCE7),
                 iconColor: const Color(0xFF0D7A53),
-                value: '350',
+                value: '$totalBarcodes',
                 label: 'Global Barcodes',
               ),
               _buildStatCard(
                 icon: Icons.widgets_outlined,
                 iconBgColor: const Color(0xFFFEF3C7),
                 iconColor: const Color(0xFFD97706),
-                value: '1,240',
+                value: '$inventoryItems',
                 label: 'Inventory Items',
               ),
               _buildStatCard(
                 icon: Icons.warning_amber_rounded,
                 iconBgColor: const Color(0xFFFEE2E2),
                 iconColor: const Color(0xFFDC2626),
-                value: '42',
+                value: '$expiredItems',
                 label: 'Expired Items',
               ),
             ],
@@ -269,7 +302,10 @@ class AdminDashboardView extends StatelessWidget {
           // Quick Actions Title
           const Text(
             'Quick Actions',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+            style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87),
           ),
           const SizedBox(height: 16),
 
@@ -310,7 +346,7 @@ class AdminDashboardView extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -333,7 +369,8 @@ class AdminDashboardView extends StatelessWidget {
               const SizedBox(width: 12),
               Text(
                 value,
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                style:
+                    const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -352,12 +389,13 @@ class AdminDashboardView extends StatelessWidget {
     required String title,
     required VoidCallback onTap,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
+    return Material(
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey.shade200),
+        side: BorderSide(color: Colors.grey.shade200),
       ),
+      clipBehavior: Clip.antiAlias,
       child: ListTile(
         onTap: onTap,
         leading: Icon(icon, color: const Color(0xFF0D7A53), size: 26),
@@ -365,7 +403,8 @@ class AdminDashboardView extends StatelessWidget {
           title,
           style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
         ),
-        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey),
+        trailing: const Icon(Icons.arrow_forward_ios_rounded,
+            size: 16, color: Colors.grey),
       ),
     );
   }

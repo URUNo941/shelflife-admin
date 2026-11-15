@@ -19,6 +19,21 @@ class _UserMainViewState extends State<UserMainView> {
   int _index = 0;
 
   @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  /// ดึงของในตู้ของผู้ใช้ที่ล็อกอินจาก backend (โหมด test ไม่ทำอะไร)
+  Future<void> _load() async {
+    final error = await UserInventory.instance.load();
+    if (error != null && mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error)));
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFFCF8FF),
@@ -48,8 +63,10 @@ class _UserMainViewState extends State<UserMainView> {
         onDestinationSelected: (i) => setState(() => _index = i),
         destinations: const [
           NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Home'),
-          NavigationDestination(icon: Icon(Icons.inventory_2_outlined), label: 'Inventory'),
-          NavigationDestination(icon: Icon(Icons.person_outline), label: 'Account'),
+          NavigationDestination(
+              icon: Icon(Icons.inventory_2_outlined), label: 'Inventory'),
+          NavigationDestination(
+              icon: Icon(Icons.person_outline), label: 'Account'),
         ],
       ),
     );
@@ -67,11 +84,22 @@ class UserHomeView extends StatelessWidget {
       listenable: UserInventory.instance,
       builder: (context, _) {
         final items = UserInventory.instance.items;
-        final expired = items.where((i) => i.isExpired).length;
-        final soon = items.where((i) => i.isExpiringSoon).length;
-        final fresh = items.length - expired - soon;
-        final urgent = items.where((i) => i.isExpired || i.isExpiringSoon).toList()
+        final totalQuantity =
+            items.fold<int>(0, (total, item) => total + item.qty);
+        final critical = items
+            .where((item) => item.isCritical)
+            .fold<int>(0, (total, item) => total + item.qty);
+        final soon = items
+            .where((item) => item.isExpiringSoon)
+            .fold<int>(0, (total, item) => total + item.qty);
+        final fresh = totalQuantity - critical - soon;
+        // ของที่ยังไม่หมดอายุ แต่เป็นสีแดง/เหลือง = ควรใช้ก่อน
+        final urgent = items
+            .where((item) =>
+                !item.isExpired && (item.isCritical || item.isExpiringSoon))
+            .toList()
           ..sort((a, b) => a.expiry.compareTo(b.expiry));
+        final expiredBatches = items.where((item) => item.isExpired).length;
 
         return SingleChildScrollView(
           padding: const EdgeInsets.all(20),
@@ -79,8 +107,13 @@ class UserHomeView extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text('Welcome back,', style: TextStyle(color: Colors.grey)),
-              const Text('My Shelf', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 20),
+              const Text('My Shelf',
+                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              // Smart Alert: เตือนทันทีที่เข้าแอปถ้ามีของหมดอายุ/ใกล้หมดอายุ
+              if (expiredBatches > 0 || urgent.isNotEmpty)
+                _SmartAlert(expired: expiredBatches, urgent: urgent.length),
+              const SizedBox(height: 4),
               GridView.count(
                 crossAxisCount: 2,
                 shrinkWrap: true,
@@ -89,20 +122,28 @@ class UserHomeView extends StatelessWidget {
                 mainAxisSpacing: 16,
                 childAspectRatio: 1.4,
                 children: [
-                  _stat(Icons.inventory_2_outlined, kUserGreen, '${items.length}', 'Total Items'),
-                  _stat(Icons.schedule, const Color(0xFFD97706), '$soon', 'Expiring Soon'),
-                  _stat(Icons.warning_amber_rounded, const Color(0xFFDC2626), '$expired', 'Expired'),
-                  _stat(Icons.check_circle_outline, const Color(0xFF1E88E5), '$fresh', 'Still Fresh'),
+                  _stat(Icons.inventory_2_outlined, kUserGreen,
+                      '$totalQuantity', 'Total Items'),
+                  _stat(Icons.schedule, const Color(0xFFD97706), '$soon',
+                      'Expiring Soon'),
+                  _stat(Icons.warning_amber_rounded, const Color(0xFFDC2626),
+                      '$critical', 'Critical'),
+                  _stat(Icons.check_circle_outline, kUserGreen, '$fresh',
+                      'Still Fresh'),
                 ],
               ),
               const SizedBox(height: 24),
               Row(children: [
-                const Text('Use these first', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const Text('Use these first',
+                    style:
+                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const Spacer(),
                 TextButton(onPressed: onSeeAll, child: const Text('View all')),
               ]),
               if (urgent.isEmpty)
-                const Padding(padding: EdgeInsets.all(16), child: Text('Nothing is expiring soon 🎉')),
+                const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text('Nothing is expiring soon 🎉')),
               for (final item in urgent.take(3))
                 Card(
                   elevation: 0,
@@ -114,12 +155,16 @@ class UserHomeView extends StatelessWidget {
                   child: ListTile(
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => UserItemFormView(item: item)),
+                      MaterialPageRoute(
+                          builder: (_) => UserItemFormView(item: item)),
                     ),
-                    title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    title: Text(item.name,
+                        style: const TextStyle(fontWeight: FontWeight.w600)),
                     subtitle: Text(item.category),
                     trailing: Text(item.statusText,
-                        style: TextStyle(color: item.statusColor, fontWeight: FontWeight.w600)),
+                        style: TextStyle(
+                            color: item.statusColor,
+                            fontWeight: FontWeight.w600)),
                   ),
                 ),
             ],
@@ -144,16 +189,59 @@ class UserHomeView extends StatelessWidget {
           Row(children: [
             Container(
               padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
+              decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10)),
               child: Icon(icon, color: color, size: 22),
             ),
             const SizedBox(width: 12),
-            Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            Text(value,
+                style:
+                    const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
           ]),
           const SizedBox(height: 10),
-          Text(label, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+          Text(label,
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
         ],
       ),
+    );
+  }
+}
+
+/// แถบเตือนบนหน้า Home (Smart Alert) สีแดงถ้ามีของหมดอายุ ไม่งั้นสีเหลือง
+class _SmartAlert extends StatelessWidget {
+  final int expired;
+  final int urgent;
+  const _SmartAlert({required this.expired, required this.urgent});
+
+  @override
+  Widget build(BuildContext context) {
+    final danger = expired > 0;
+    final color = danger ? const Color(0xFFDC2626) : const Color(0xFFD97706);
+    final parts = [
+      if (expired > 0) '$expired batch${expired == 1 ? '' : 'es'} expired',
+      if (urgent > 0) '$urgent should be used soon',
+    ];
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Row(children: [
+        Icon(danger ? Icons.warning_amber_rounded : Icons.notifications_active_outlined,
+            color: color),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            parts.join(' · '),
+            style: TextStyle(color: color, fontWeight: FontWeight.w600),
+          ),
+        ),
+      ]),
     );
   }
 }

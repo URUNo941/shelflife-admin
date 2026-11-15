@@ -1,4 +1,5 @@
-const { query, handleDatabaseError, isPositiveId } = require('../utils/db');
+const { query, withTransaction, handleDatabaseError, isPositiveId } = require('../utils/db');
+const { PRODUCT_SELECT, categoryId } = require('../utils/catalog');
 
 function validateProduct(body, partial = false) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return 'A JSON object is required.';
@@ -15,7 +16,7 @@ function validateProduct(body, partial = false) {
 
 async function listProducts(req, res) {
   try {
-    const rows = await query('SELECT * FROM global_products ORDER BY product_name ASC');
+    const rows = await query(`${PRODUCT_SELECT} ORDER BY p.product_name ASC`);
     return res.json(rows);
   } catch (error) {
     return handleDatabaseError(res, error);
@@ -25,7 +26,7 @@ async function listProducts(req, res) {
 async function findProduct(req, res, field, key) {
   if (field === 'product_id' && !isPositiveId(key)) return res.status(400).json({ message: 'productId must be a positive integer.' });
   try {
-    const rows = await query(`SELECT * FROM global_products WHERE ${field} = ?`, [key]);
+    const rows = await query(`${PRODUCT_SELECT} WHERE p.${field} = ?`, [key]);
     if (!rows.length) return res.status(404).json({ message: 'Product not found.' });
     return res.json(rows[0]);
   } catch (error) {
@@ -45,11 +46,15 @@ async function createProduct(req, res) {
   const validationError = validateProduct(req.body);
   if (validationError) return res.status(400).json({ message: validationError });
   try {
-    const result = await query(
-      'INSERT INTO global_products (barcode, product_name, category, created_by) VALUES (?, ?, ?, ?)',
-      [req.body.barcode.trim(), req.body.product_name.trim(), req.body.category || 'General', req.auth.userId],
-    );
-    const rows = await query('SELECT * FROM global_products WHERE product_id = ?', [result.insertId]);
+    const productId = await withTransaction(async (q) => {
+      const catId = await categoryId(q, req.body.category);
+      const result = await q(
+        'INSERT INTO products (barcode, product_name, category_id, created_by) VALUES (?, ?, ?, ?)',
+        [req.body.barcode.trim(), req.body.product_name.trim(), catId, req.auth.userId],
+      );
+      return result.insertId;
+    });
+    const rows = await query(`${PRODUCT_SELECT} WHERE p.product_id = ?`, [productId]);
     return res.status(201).json(rows[0]);
   } catch (error) {
     return handleDatabaseError(res, error);
@@ -60,33 +65,45 @@ async function updateProduct(req, res) {
   if (!isPositiveId(req.params.productId)) return res.status(400).json({ message: 'productId must be a positive integer.' });
   const validationError = validateProduct(req.body, true);
   if (validationError) return res.status(400).json({ message: validationError });
-  const fields = ['barcode', 'product_name', 'category'];
-  const updates = [];
-  const values = [];
-  for (const field of fields) {
-    if (Object.prototype.hasOwnProperty.call(req.body, field)) {
-      updates.push(`${field} = ?`);
-      values.push(typeof req.body[field] === 'string' ? req.body[field].trim() : req.body[field]);
-    }
+  const has = (field) => Object.prototype.hasOwnProperty.call(req.body, field);
+  if (!['barcode', 'product_name', 'category'].some(has)) {
+    return res.status(400).json({ message: 'At least one product field is required.' });
   }
-  if (!updates.length) return res.status(400).json({ message: 'At least one product field is required.' });
   try {
-    const result = await query(
-      `UPDATE global_products SET ${updates.join(', ')} WHERE product_id = ?`,
-      [...values, req.params.productId],
-    );
-    if (!result.affectedRows) return res.status(404).json({ message: 'Product not found.' });
-    const rows = await query('SELECT * FROM global_products WHERE product_id = ?', [req.params.productId]);
+    const found = await withTransaction(async (q) => {
+      const updates = [];
+      const values = [];
+      if (has('barcode')) {
+        updates.push('barcode = ?');
+        values.push(req.body.barcode.trim());
+      }
+      if (has('product_name')) {
+        updates.push('product_name = ?');
+        values.push(req.body.product_name.trim());
+      }
+      if (has('category')) {
+        updates.push('category_id = ?');
+        values.push(await categoryId(q, req.body.category));
+      }
+      const result = await q(
+        `UPDATE products SET ${updates.join(', ')} WHERE product_id = ?`,
+        [...values, req.params.productId],
+      );
+      return result.affectedRows > 0;
+    });
+    if (!found) return res.status(404).json({ message: 'Product not found.' });
+    const rows = await query(`${PRODUCT_SELECT} WHERE p.product_id = ?`, [req.params.productId]);
     return res.json(rows[0]);
   } catch (error) {
     return handleDatabaseError(res, error);
   }
 }
 
+// A product still used by someone's inventory cannot be deleted (409).
 async function deleteProduct(req, res) {
   if (!isPositiveId(req.params.productId)) return res.status(400).json({ message: 'productId must be a positive integer.' });
   try {
-    const result = await query('DELETE FROM global_products WHERE product_id = ?', [req.params.productId]);
+    const result = await query('DELETE FROM products WHERE product_id = ?', [req.params.productId]);
     if (!result.affectedRows) return res.status(404).json({ message: 'Product not found.' });
     return res.status(204).end();
   } catch (error) {

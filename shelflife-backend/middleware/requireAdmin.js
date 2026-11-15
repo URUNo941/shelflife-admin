@@ -1,27 +1,10 @@
-const jwt = require('jsonwebtoken');
+const { requireAuth, requireRole } = require('./requireAuth');
+
+// Admin เท่านั้น = ต้องมี JWT ที่ถูกต้อง และ role = admin
+const onlyAdmin = requireRole('admin');
 
 function requireAdmin(req, res, next) {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    return res.status(503).json({ message: 'Authentication is not configured.' });
-  }
-
-  const authorization = req.get('authorization') || '';
-  const [scheme, token] = authorization.split(' ');
-  if (scheme !== 'Bearer' || !token) {
-    return res.status(401).json({ message: 'Authentication required.' });
-  }
-
-  try {
-    const payload = jwt.verify(token, secret);
-    if (payload.role !== 'admin' || !Number.isInteger(payload.userId)) {
-      return res.status(403).json({ message: 'Administrator access required.' });
-    }
-    req.auth = payload;
-    return next();
-  } catch (error) {
-    return res.status(401).json({ message: 'Invalid or expired token.' });
-  }
+  return requireAuth(req, res, () => onlyAdmin(req, res, next));
 }
 
 module.exports = requireAdmin;
