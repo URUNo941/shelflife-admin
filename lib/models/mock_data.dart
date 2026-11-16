@@ -68,6 +68,14 @@ class MockData {
           createdBy: 1,
           createdAt: DateTime(2026, 10, 3),
         ),
+        ProductModel(
+          productId: 6,
+          barcode: '8850123111222',
+          productName: 'Cavendish Banana',
+          category: 'Food',
+          createdBy: 1,
+          createdAt: DateTime(2026, 10, 4),
+        ),
       ];
 
   // ---------------------------------------------------------------------------

@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ShelfLife - แผ่นรูปภาพบาร์โค้ดสำหรับสแกนสินค้า (6 รายการ)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap');
+
+    :root {
+      --primary: #0D7A53;
+      --bg: #F8FAFC;
+      --card-bg: #FFFFFF;
+      --text: #0F172A;
+      --border: #E2E8F0;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Prompt', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    header {
+      background: linear-gradient(135deg, #0D7A53 0%, #10B981 100%);
+      color: white;
+      padding: 24px 30px;
+      border-radius: 16px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .header-text h1 {
+      font-size: 24px;
+      font-weight: 700;
+    }
+
+    .header-text p {
+      font-size: 14px;
+      opacity: 0.92;
+      margin-top: 4px;
+    }
+
+    .btn {
+      background: white;
+      color: var(--primary);
+      border: none;
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: 'Prompt', sans-serif;
+      border-radius: 10px;
+      cursor: pointer;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      background: #F1F5F9;
+      transform: translateY(-1px);
+    }
+
+    .instructions {
+      background: #ECFDF5;
+      border: 1px solid #A7F3D0;
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 24px;
+      font-size: 14px;
+      color: #065F46;
+      line-height: 1.8;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
+      gap: 20px;
+    }
+
+    .barcode-card {
+      background: white;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 12px;
+      transition: transform 0.2s;
+    }
+
+    .barcode-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    }
+
+    .barcode-card img {
+      width: 100%;
+      height: auto;
+      border-radius: 8px;
+      display: block;
+    }
+
+    .card-actions {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 8px 4px 8px;
+      font-size: 13px;
+    }
+
+    .card-actions a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .card-actions a:hover {
+      text-decoration: underline;
+    }
+
+    @media print {
+      body {
+        background: white;
+        padding: 0;
+      }
+      .btn, .instructions, .card-actions {
+        display: none !important;
+      }
+      header {
+        background: none;
+        color: black;
+        border: 1px solid #CBD5E1;
+        padding: 12px;
+        margin-bottom: 12px;
+      }
+      .grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+      }
+      .barcode-card {
+        box-shadow: none;
+        break-inside: avoid;
+        border: 1px solid #CBD5E1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="header-text">
+        <h1>📸 ShelfLife - แผ่นรูปภาพบาร์โค้ดสำหรับสแกนสินค้า (6 รายการ)</h1>
+        <p>เปิดกล้องในแอป ShelfLife แล้วส่องสแกนจากหน้าจอนี้ได้ทันที ข้อมูลจะถูกดึงเข้าฟอร์มอัตโนมัติ</p>
+      </div>
+      <div>
+        <button class="btn" onclick="window.print()">🖨️ พิมพ์หน้านี้ / บันทึก PDF</button>
+      </div>
+    </header>
+
+    <div class="instructions">
+      👉 <strong>วิธีสแกนทดสอบเพื่อส่งอาจารย์:</strong>
+      <ol style="margin-left: 20px; margin-top: 6px;">
+        <li>เปิดแอป <strong>ShelfLife</strong> (บนมือถือหรือในเว็บ) แล้วกดปุ่ม <strong>+ (เพิ่มสินค้า)</strong></li>
+        <li>กดปุ่มไอคอน <strong>📷 สแกนบาร์โค้ด</strong></li>
+        <li>ส่องกล้องมาที่รูปบาร์โค้ดด้านล่างนี้ ระบบจะอ่านรหัสและ <strong>เติมชื่อสินค้า + หมวดหมู่อัตโนมัติ (Smart Barcode Auto-Fill)</strong></li>
+        <li>เลือกใส่วันหมดอายุตามที่แนะนำ แล้วกดบันทึก สินค้าจะเข้าไปอยู่ในตู้ทันที!</li>
+      </ol>
+    </div>
+
+    <div class="grid">
+      <div class="barcode-card">
+        <img src="barcodes/barcode_1.png" alt="นมสด 1L">
+        <div class="card-actions">
+          <span>🥛 นมสด (Fresh Milk 1L)</span>
+          <a href="barcodes/barcode_1.png" target="_blank" download>ดาวน์โหลดรูป PNG</a>
+        </div>
+      </div>
+
+      <div class="barcode-card">
+        <img src="barcodes/barcode_2.png" alt="ยาพาราเซตามอล">
+        <div class="card-actions">
+          <span>💊 ยาพาราเซตามอล (Paracetamol 500mg)</span>
+          <a href="barcodes/barcode_2.png" target="_blank" download>ดาวน์โหลดรูป PNG</a>
+        </div>
+      </div>
+
+      <div class="barcode-card">
+        <img src="barcodes/barcode_3.png" alt="บะหมี่กึ่งสำเร็จรูป">
+        <div class="card-actions">
+          <span>🍜 บะหมี่กึ่งสำเร็จรูป (Instant Noodles)</span>
+          <a href="barcodes/barcode_3.png" target="_blank" download>ดาวน์โหลดรูป PNG</a>
+        </div>
+      </div>
+
+      <div class="barcode-card">
+        <img src="barcodes/barcode_4.png" alt="ไข่ไก่สด 10 ฟอง">
+        <div class="card-actions">
+          <span>🥚 ไข่ไก่สด 10 ฟอง (Eggs 10s)</span>
+          <a href="barcodes/barcode_4.png" target="_blank" download>ดาวน์โหลดรูป PNG</a>
+        </div>
+      </div>
+
+      <div class="barcode-card">
+        <img src="barcodes/barcode_5.png" alt="กล้วยหอมทอง">
+        <div class="card-actions">
+          <span>🍌 กล้วยหอมทอง (Cavendish Banana)</span>
+          <a href="barcodes/barcode_5.png" target="_blank" download>ดาวน์โหลดรูป PNG</a>
+        </div>
+      </div>
+
+      <div class="barcode-card">
+        <img src="barcodes/barcode_6.png" alt="ขนมปังแผ่นโฮลวีต">
+        <div class="card-actions">
+          <span>🍞 ขนมปังแผ่น (Sliced Bread)</span>
+          <a href="barcodes/barcode_6.png" target="_blank" download>ดาวน์โหลดรูป PNG</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
