@@ -1,6 +1,14 @@
+import 'dart:io';
+import 'dart:convert'; // เพิ่มสำหรับแปลง JSON
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:http/http.dart' as http; // เพิ่มสำหรับยิง API อัปโหลดรูป
 
+// นำเข้า Controller ตามโครงสร้างไฟล์ต้นฉบับ
 import '../../controllers/product_controller.dart';
+import '../../controllers/user_inventory_controller.dart';
+import '../../services/api_client.dart';
 import 'user_data.dart';
 import 'user_scan_view.dart';
 
@@ -52,6 +60,10 @@ class _UserItemFormViewState extends State<UserItemFormView> {
   late DateTime _expiry;
   late int _qty;
 
+  // --- ส่วนจัดการรูปภาพ ---
+  XFile? _selectedImage;
+  final ImagePicker _picker = ImagePicker();
+
   bool get _isEdit => widget.item != null;
 
   @override
@@ -75,6 +87,20 @@ class _UserItemFormViewState extends State<UserItemFormView> {
   String _fmt(DateTime d) =>
       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 
+  // --- ฟังก์ชันเลือกรูปจากแกลเลอรี ---
+  Future<void> _pickImage() async {
+    try {
+      final XFile? pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+      if (pickedFile != null) {
+        setState(() {
+          _selectedImage = pickedFile;
+        });
+      }
+    } catch (e) {
+      _showError('Failed to pick image: $e');
+    }
+  }
+
   /// เปิดกล้องสแกน แล้วใส่ barcode ที่ได้ลงฟอร์ม
   Future<void> _scanBarcode() async {
     final code = await Navigator.push<String>(
@@ -86,12 +112,10 @@ class _UserItemFormViewState extends State<UserItemFormView> {
     _fillFromCatalog(code);
   }
 
-  /// Smart Barcode Auto-Fill: ถ้า barcode อยู่ใน Master Catalog และยังไม่ได้กรอกชื่อ
-  /// ให้เติมชื่อ/หมวดหมู่ให้อัตโนมัติ (ถาม backend: GET /api/products/master/:barcode)
+  /// Smart Barcode Auto-Fill
   Future<void> _fillFromCatalog(String code) async {
     if (_name.text.trim().isNotEmpty || code.trim().isEmpty) return;
     final product = await ProductController.instance.lookup(code);
-    // ผู้ใช้อาจพิมพ์ต่อระหว่างรอ: ใช้ผลเฉพาะเมื่อ barcode ยังเป็นค่าเดิม
     if (product == null || !mounted || _barcode.text.trim() != code.trim()) {
       return;
     }
@@ -116,10 +140,43 @@ class _UserItemFormViewState extends State<UserItemFormView> {
     if (d != null) setState(() => _expiry = d);
   }
 
+  // --- ฟังก์ชันบันทึกข้อมูล (เพิ่มระบบส่งรูปไป Backend) ---
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    
+    String? uploadedImageUrl;
+
+    // ถ้ามีการเลือกรูปใหม่ ให้ยิง API ไปอัปโหลดที่ Backend ก่อน
+    if (_selectedImage != null) {
+      try {
+        var uri = Uri.parse('${ApiClient.instance.baseUrl}/upload');
+        var request = http.MultipartRequest('POST', uri);
+
+        if (kIsWeb) {
+          var bytes = await _selectedImage!.readAsBytes();
+          request.files.add(http.MultipartFile.fromBytes('image', bytes, filename: _selectedImage!.name));
+        } else {
+          request.files.add(await http.MultipartFile.fromPath('image', _selectedImage!.path));
+        }
+
+        var response = await request.send();
+        if (response.statusCode == 200) {
+          var responseData = await response.stream.bytesToString();
+          var json = jsonDecode(responseData);
+          uploadedImageUrl = json['imageUrl']; // ได้ลิงก์รูปกลับมา
+        } else {
+          _showError('Upload failed. Please try again.');
+          return;
+        }
+      } catch (e) {
+        _showError('Error uploading image: $e');
+        return;
+      }
+    }
+
     final inv = UserInventory.instance;
     final oldItem = widget.item;
+    
     final candidate = UserItem(
       id: oldItem?.id ?? inv.newId(),
       barcode: _barcode.text.trim(),
@@ -128,7 +185,9 @@ class _UserItemFormViewState extends State<UserItemFormView> {
       expiry: _expiry,
       addedAt: oldItem?.addedAt,
       qty: _qty,
+      imageUrl: uploadedImageUrl ?? oldItem?.imageUrl, // แนบลิงก์รูปไปด้วย
     );
+    
     final matchingBatch = inv.findBatch(
       barcode: candidate.barcode,
       expiry: candidate.expiry,
@@ -167,8 +226,7 @@ class _UserItemFormViewState extends State<UserItemFormView> {
       if (choice == 'merge') mergeInto = matchingBatch;
     }
 
-    final error =
-        await inv.saveItem(candidate, replacing: oldItem, mergeInto: mergeInto);
+    final error = await inv.saveItem(candidate, replacing: oldItem, mergeInto: mergeInto);
     if (!mounted) return;
     if (error != null) return _showError(error);
     Navigator.pop(context);
@@ -182,6 +240,27 @@ class _UserItemFormViewState extends State<UserItemFormView> {
       if (error != null) return _showError(error);
       Navigator.pop(context);
     }
+  }
+
+  // --- ฟังก์ชันแสดงตัวอย่างรูปภาพ ---
+  Widget _buildImagePreview() {
+    if (_selectedImage == null && _isEdit && widget.item!.imageUrl != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.network(widget.item!.imageUrl!, fit: BoxFit.cover),
+      );
+    }
+    
+    if (_selectedImage == null) {
+      return const Icon(Icons.image_outlined, size: 50, color: Colors.grey);
+    }
+    
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: kIsWeb
+          ? Image.network(_selectedImage!.path, fit: BoxFit.cover)
+          : Image.file(File(_selectedImage!.path), fit: BoxFit.cover),
+    );
   }
 
   @override
@@ -200,6 +279,33 @@ class _UserItemFormViewState extends State<UserItemFormView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // --- UI ส่วนเลือกรูปภาพ ---
+              Center(
+                child: Column(
+                  children: [
+                    Container(
+                      height: 150,
+                      width: 150,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade400),
+                      ),
+                      child: _buildImagePreview(),
+                    ),
+                    const SizedBox(height: 12),
+                    TextButton.icon(
+                      onPressed: _pickImage,
+                      icon: const Icon(Icons.photo_library),
+                      label: const Text('Select Image'),
+                      style: TextButton.styleFrom(foregroundColor: kUserGreen),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              // --- สิ้นสุด UI ส่วนรูปภาพ ---
+
               TextFormField(
                 controller: _barcode,
                 keyboardType: TextInputType.number,
@@ -230,7 +336,6 @@ class _UserItemFormViewState extends State<UserItemFormView> {
                 initialValue: _category,
                 decoration: const InputDecoration(
                     labelText: 'Category *', border: OutlineInputBorder()),
-                // หมวดจากแคตตาล็อกอาจไม่อยู่ใน 3 หมวดหลัก (เช่น Fruit) ก็ให้เลือกได้
                 items: [
                   ...kCategories,
                   if (!kCategories.contains(_category)) _category,

@@ -192,6 +192,7 @@ class _UserInventoryViewState extends State<UserInventoryView> {
                   tilePadding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                   childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                  // --- ส่วนแสดงรูปภาพสินค้า (ถ้ามีรูปแสดงรูป ถ้าไม่มีแสดงไอคอนเดิม) ---
                   leading: Container(
                     width: 44,
                     height: 44,
@@ -200,12 +201,28 @@ class _UserInventoryViewState extends State<UserInventoryView> {
                           .withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(
-                      productBatches.first.category == 'Medicine'
-                          ? Icons.medication_outlined
-                          : Icons.restaurant_outlined,
-                      color: productBatches.first.statusColor,
-                    ),
+                    child: productBatches.first.imageUrl != null &&
+                            productBatches.first.imageUrl!.isNotEmpty
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: Image.network(
+                              productBatches.first.imageUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Icon(
+                                productBatches.first.category == 'Medicine'
+                                    ? Icons.medication_outlined
+                                    : Icons.restaurant_outlined,
+                                color: productBatches.first.statusColor,
+                              ),
+                            ),
+                          )
+                        : Icon(
+                            productBatches.first.category == 'Medicine'
+                                ? Icons.medication_outlined
+                                : Icons.restaurant_outlined,
+                            color: productBatches.first.statusColor,
+                          ),
                   ),
                   title: Text(
                     '${productBatches.first.name}  ×${productBatches.fold<int>(0, (total, item) => total + item.qty)}',

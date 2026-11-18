@@ -137,6 +137,7 @@ class UserInventory extends ChangeNotifier {
             ? null
             : parseApiDate(json['created_at'] as String),
         qty: (json['quantity'] as num?)?.toInt() ?? 1,
+        imageUrl: json['image_url'] as String?, // <--- เพิ่มจุดนี้: รองรับอ่านลิงก์รูปภาพจากฐานข้อมูล
       );
 
   static Map<String, dynamic> _toJson(UserItem item) => {
@@ -145,6 +146,7 @@ class UserInventory extends ChangeNotifier {
         'category': item.category,
         'quantity': item.qty,
         'expiration_date': formatApiDate(item.expiry),
+        'image_url': item.imageUrl, // <--- เพิ่มจุดนี้: ส่งลิงก์รูปภาพไปบันทึกลงฐานข้อมูล
       };
 
   // ---------------------------------------------------------------------------
@@ -160,8 +162,12 @@ class UserInventory extends ChangeNotifier {
     }
     try {
       if (mergeInto != null) {
-        final row = await _api.put('/items/${mergeInto.id}', {
+        final update = <String, dynamic>{
           'quantity': mergeInto.qty + item.qty,
+        };
+        if (item.imageUrl != null) update['image_url'] = item.imageUrl;
+        final row = await _api.put('/items/${mergeInto.id}', {
+          ...update,
         });
         _replace(mergeInto.id, itemFromJson(row as Map<String, dynamic>));
         if (replacing != null) {

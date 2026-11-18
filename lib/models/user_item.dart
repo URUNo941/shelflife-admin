@@ -22,6 +22,7 @@ class UserItem {
   DateTime expiry; // วันหมดอายุ
   final DateTime addedAt; // วันที่เพิ่มเข้าตู้ (ใช้คำนวณ % อายุที่เหลือ จึงห้ามเปลี่ยน)
   int qty; // จำนวนชิ้นในล็อตนี้
+  String? imageUrl; // <--- 1. เพิ่มตัวเก็บลิงก์รูปลงไปตรงนี้
 
   UserItem({
     required this.id,
@@ -31,18 +32,14 @@ class UserItem {
     required this.expiry,
     DateTime? addedAt, // ไม่บังคับส่ง
     this.qty = 1, // ไม่ระบุจำนวน = 1 ชิ้น
+    this.imageUrl, // <--- 2. เพิ่มเข้ามาในนี้ เพื่อให้ตอนสร้างรับค่ารูปได้
   }) : addedAt = addedAt ?? DateTime.now();
-  // ↑ initializer list (หลังเครื่องหมาย :) ทำงานก่อนสร้าง object เสร็จ
-  //   ถ้าไม่ส่ง addedAt มา ให้ใช้ "เวลาตอนนี้" แทน
-  //   ต้องเขียนแบบนี้เพราะ DateTime.now() เป็นค่า default ใน () ตรงๆ ไม่ได้ (ไม่ใช่ const)
 
   // ---------------------------------------------------------------------------
   // Getter คำนวณสถานะวันหมดอายุ (คำนวณใหม่ทุกครั้งที่เรียก จึงอัปเดตตามวันจริงเสมอ)
   // ---------------------------------------------------------------------------
 
   // เหลืออีกกี่วันจะหมดอายุ (ติดลบ = หมดไปแล้วกี่วัน)
-  // ตัดเวลาของวันนี้ทิ้ง (เหลือแค่ วัน/เดือน/ปี) เพื่อนับเป็น "วันเต็ม"
-  // ไม่งั้นตอนบ่ายอาจนับได้น้อยกว่าความจริง 1 วัน
   int get daysLeft {
     final n = DateTime.now();
     return expiry.difference(DateTime(n.year, n.month, n.day)).inDays;
@@ -52,17 +49,12 @@ class UserItem {
   bool get isExpired => daysLeft < 0;
 
   // อายุที่เหลือเป็น % (0-100) นับจาก "วันที่เพิ่มเข้าตู้" ถึง "วันหมดอายุ"
-  // เช่น เพิ่มวันที่ 1 หมดวันที่ 11 (อายุ 10 วัน) วันนี้วันที่ 8 -> เหลือ 3 วัน = 30%
-  // ใช้ % แทนจำนวนวัน เพราะยุติธรรมกับสินค้าทุกแบบ
-  //   (นมอายุ 7 วันเหลือ 3 วัน = น่าห่วง แต่ยาอายุ 2 ปีเหลือ 3 วัน = วิกฤต)
-  // ส่งไปคำนวณที่ ExpiryStatus (utils) เพื่อให้ทุกหน้าใช้สูตรเดียวกัน
   double get remainingLifePercentage => ExpiryStatus.remainingPercentage(
         addedAt: addedAt,
         expiryDate: expiry,
       );
 
   // วิกฤต (สีแดง): หมดวันนี้/หมดแล้ว หรือ อายุเหลือน้อยกว่า 10%
-  // (กรณีเหลือ 1 วันพอดีไม่นับเป็นวิกฤต ให้เป็นสีเหลืองแทน)
   bool get isCritical =>
       daysLeft <= 0 || (daysLeft > 1 && remainingLifePercentage < 10);
 
@@ -73,17 +65,10 @@ class UserItem {
           (remainingLifePercentage >= 10 && remainingLifePercentage < 30));
 
   // สีสถานะที่ใช้แสดงบนการ์ดสินค้า:
-  //   เขียว  = อายุเหลือ >= 30%
-  //   เหลือง = เหลือ 10-30% หรือเหลืออีก 1 วัน
-  //   แดง   = เหลือ < 10%, หมดวันนี้ หรือหมดอายุแล้ว
   Color get statusColor =>
       ExpiryStatus.color(addedAt: addedAt, expiryDate: expiry);
 
-  // ข้อความสถานะใต้ชื่อสินค้า (ternary ซ้อน: เงื่อนไข ? ค่าถ้าจริง : ค่าถ้าเท็จ)
-  //   หมดแล้ว        -> 'Expired 3d ago'   (-daysLeft ทำให้ค่าติดลบเป็นบวก)
-  //   หมดวันนี้      -> 'Expires today'
-  //   เหลือ 1 วัน    -> '1 day left'        (ไม่เติม s)
-  //   เหลือหลายวัน   -> '5 days left'
+  // ข้อความสถานะใต้ชื่อสินค้า
   String get statusText => isExpired
       ? 'Expired ${-daysLeft}d ago'
       : daysLeft == 0
