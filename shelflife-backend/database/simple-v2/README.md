@@ -47,7 +47,7 @@ erDiagram
 |---|---|
 | users | `user_id` INT PK, `username` VARCHAR(50) UNIQUE, `email` VARCHAR(254) NULL UNIQUE, `password_hash` VARCHAR(255), `role` ENUM(user,admin), `created_at`/`updated_at` TIMESTAMP |
 | categories | `category_id` INT PK, `category_name` VARCHAR(50) UNIQUE |
-| products | `product_id` INT PK, `barcode` VARCHAR(50) NULL UNIQUE, `product_name` VARCHAR(100), `category_id` FK, `created_by` NULL FK, `created_at` TIMESTAMP, `unbarcoded_name` (อัตโนมัติ) |
+| products | `product_id` INT PK, `barcode` VARCHAR(50) NULL UNIQUE, `product_name` VARCHAR(100), `image_url` VARCHAR(2048) NULL, `category_id` FK, `created_by` NULL FK, `created_at` TIMESTAMP, `unbarcoded_name` (อัตโนมัติ) |
 | inventory_items | `item_id` INT PK, `user_id` FK, `product_id` FK, `quantity` INT CHECK > 0, `expiration_date` DATE, `status` ENUM(active,consumed,discarded), `status_updated_at` NULL TIMESTAMP, `created_at`/`updated_at` TIMESTAMP |
 
 - `email` เป็น NULL สำหรับบัญชีเดิม ไม่สร้างอีเมลปลอมหรือแก้รหัสผ่าน
@@ -69,6 +69,7 @@ erDiagram
 ## ไฟล์ที่ใช้
 
 - `schema.sql` — โครงสร้างใหม่ครบ 4 ตาราง สำหรับฐานข้อมูลว่างเท่านั้น
+- `migrations/001_add_product_image_url.sql` — เพิ่มคอลัมน์รูปให้ฐานข้อมูล V2 ที่ติดตั้งอยู่แล้ว (รันครั้งเดียว)
 - `copy-to-test.js` — ตรวจ V1 และคัดลอกไปฐานข้อมูลทดสอบใหม่ โดยไม่เขียนต้นทาง
 - `database.test.js` — ทดสอบความสัมพันธ์ การกันข้อมูลผิด และการรักษาต้นทาง
 - `example-queries.sql` — ตัวอย่าง JOIN เพื่ออ่านชื่อสินค้าโดยไม่เก็บข้อมูลซ้ำ

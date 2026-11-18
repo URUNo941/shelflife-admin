@@ -7,7 +7,7 @@ const { ITEM_SELECT, productIdFor } = require('../utils/catalog');
 // คอลัมน์ที่อยู่ในแถว inventory_items เอง
 const itemFields = ['quantity', 'expiration_date', 'status'];
 // ข้อมูลสินค้า อยู่ที่ products/categories (เปลี่ยนแล้วจะชี้ไปสินค้าที่ตรงกัน)
-const productFields = ['barcode', 'product_name', 'category'];
+const productFields = ['barcode', 'product_name', 'category', 'image_url'];
 const validStatuses = ['active', 'consumed', 'discarded'];
 
 function validDate(value) {
@@ -26,6 +26,7 @@ function validateItem(body, partial = false) {
   if (body.product_name !== undefined && body.product_name.trim().length > 100) return 'product_name is too long.';
   if (body.category !== undefined && body.category !== null && (typeof body.category !== 'string' || body.category.length > 50)) return 'category must be a short string.';
   if (body.barcode !== undefined && body.barcode !== null && (typeof body.barcode !== 'string' || body.barcode.length > 50)) return 'barcode must be a string or null.';
+  if (body.image_url !== undefined && body.image_url !== null && (typeof body.image_url !== 'string' || body.image_url.length > 2048)) return 'image_url must be a URL string or null.';
   if (body.quantity !== undefined && (!Number.isInteger(body.quantity) || body.quantity < 1)) return 'quantity must be a positive integer.';
   if (body.expiration_date !== undefined && !validDate(body.expiration_date)) return 'expiration_date must use YYYY-MM-DD format.';
   if (body.status !== undefined && !validStatuses.includes(body.status)) return 'status must be active, consumed or discarded.';
@@ -78,7 +79,11 @@ async function createInventoryItem(req, res) {
   const status = body.status || 'active';
   try {
     const itemId = await withTransaction(async (q) => {
-      const productId = await productIdFor(q, { ...body, created_by: req.auth.userId });
+      const productId = await productIdFor(q, {
+        ...body,
+        image_url: body.image_url ?? undefined,
+        created_by: req.auth.userId,
+      });
       const result = await q(
         `INSERT INTO inventory_items
          (user_id, product_id, quantity, expiration_date, status, status_updated_at)
@@ -123,6 +128,7 @@ async function updateInventoryItem(req, res) {
           barcode: has(body, 'barcode') ? body.barcode : current.barcode,
           product_name: has(body, 'product_name') ? body.product_name : current.product_name,
           category: has(body, 'category') ? body.category : current.category,
+          image_url: has(body, 'image_url') ? body.image_url : undefined,
           created_by: current.user_id,
         });
         updates.push('product_id = ?');

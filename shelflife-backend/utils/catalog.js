@@ -4,7 +4,7 @@
 
 const ITEM_SELECT = `
   SELECT i.item_id, i.user_id, i.product_id,
-         p.barcode, p.product_name, c.category_name AS category,
+      p.barcode, p.product_name, p.image_url, c.category_name AS category,
          i.quantity, i.expiration_date, i.status, i.status_updated_at,
          i.created_at, i.updated_at
   FROM inventory_items AS i
@@ -12,7 +12,7 @@ const ITEM_SELECT = `
   JOIN categories AS c ON c.category_id = p.category_id`;
 
 const PRODUCT_SELECT = `
-  SELECT p.product_id, p.barcode, p.product_name,
+  SELECT p.product_id, p.barcode, p.product_name, p.image_url,
          c.category_name AS category, p.category_id,
          p.created_by, p.created_at
   FROM products AS p
@@ -55,15 +55,20 @@ async function categoryId(q, name) {
 // Returns the product_id for an item. A known barcode always reuses the
 // catalog product (its name is the single source of truth). Without a
 // barcode, the same name in the same category reuses one product.
-async function productIdFor(q, { barcode, product_name, category, created_by }) {
+async function productIdFor(q, { barcode, product_name, category, created_by, image_url }) {
   const code = cleanBarcode(barcode);
   const name = product_name.trim();
   if (code) {
     const existing = (await q('SELECT product_id FROM products WHERE barcode = ?', [code]))[0];
-    if (existing) return existing.product_id;
+    if (existing) {
+      if (image_url !== undefined) {
+        await q('UPDATE products SET image_url = ? WHERE product_id = ?', [image_url, existing.product_id]);
+      }
+      return existing.product_id;
+    }
   }
   const catId = await categoryId(q, category);
-  return findOrInsert(
+  const productId = await findOrInsert(
     q,
     async () => code
       ? (await q('SELECT product_id FROM products WHERE barcode = ?', [code]))[0]?.product_id
@@ -72,10 +77,14 @@ async function productIdFor(q, { barcode, product_name, category, created_by }) 
         [name, catId],
       ))[0]?.product_id,
     async () => (await q(
-      'INSERT INTO products (barcode, product_name, category_id, created_by) VALUES (?, ?, ?, ?)',
-      [code, name, catId, created_by ?? null],
+      'INSERT INTO products (barcode, product_name, category_id, created_by, image_url) VALUES (?, ?, ?, ?, ?)',
+      [code, name, catId, created_by ?? null, image_url ?? null],
     )).insertId,
   );
+  if (image_url !== undefined) {
+    await q('UPDATE products SET image_url = ? WHERE product_id = ?', [image_url, productId]);
+  }
+  return productId;
 }
 
 module.exports = { ITEM_SELECT, PRODUCT_SELECT, categoryId, productIdFor, cleanBarcode, cleanCategory };

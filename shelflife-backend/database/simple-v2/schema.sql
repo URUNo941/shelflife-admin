@@ -25,6 +25,7 @@ CREATE TABLE products (
   product_id INT NOT NULL AUTO_INCREMENT,
   barcode VARCHAR(50) NULL,
   product_name VARCHAR(100) NOT NULL,
+  image_url VARCHAR(2048) NULL,
   category_id INT NOT NULL,
   created_by INT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

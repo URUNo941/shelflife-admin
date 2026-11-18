@@ -10,6 +10,7 @@ function validateProduct(body, partial = false) {
   if (body.barcode !== undefined && (typeof body.barcode !== 'string' || !body.barcode.trim())) return 'barcode must not be empty.';
   if (body.product_name !== undefined && (typeof body.product_name !== 'string' || !body.product_name.trim())) return 'product_name must not be empty.';
   if (body.category !== undefined && typeof body.category !== 'string') return 'category must be a string.';
+  if (body.image_url !== undefined && body.image_url !== null && (typeof body.image_url !== 'string' || body.image_url.length > 2048)) return 'image_url must be a URL string or null.';
   if (body.created_by !== undefined && body.created_by !== null && !isPositiveId(body.created_by)) return 'created_by must be a positive integer or null.';
   return null;
 }
@@ -49,8 +50,8 @@ async function createProduct(req, res) {
     const productId = await withTransaction(async (q) => {
       const catId = await categoryId(q, req.body.category);
       const result = await q(
-        'INSERT INTO products (barcode, product_name, category_id, created_by) VALUES (?, ?, ?, ?)',
-        [req.body.barcode.trim(), req.body.product_name.trim(), catId, req.auth.userId],
+        'INSERT INTO products (barcode, product_name, category_id, created_by, image_url) VALUES (?, ?, ?, ?, ?)',
+        [req.body.barcode.trim(), req.body.product_name.trim(), catId, req.auth.userId, req.body.image_url ?? null],
       );
       return result.insertId;
     });
@@ -66,7 +67,7 @@ async function updateProduct(req, res) {
   const validationError = validateProduct(req.body, true);
   if (validationError) return res.status(400).json({ message: validationError });
   const has = (field) => Object.prototype.hasOwnProperty.call(req.body, field);
-  if (!['barcode', 'product_name', 'category'].some(has)) {
+  if (!['barcode', 'product_name', 'category', 'image_url'].some(has)) {
     return res.status(400).json({ message: 'At least one product field is required.' });
   }
   try {
@@ -84,6 +85,10 @@ async function updateProduct(req, res) {
       if (has('category')) {
         updates.push('category_id = ?');
         values.push(await categoryId(q, req.body.category));
+      }
+      if (has('image_url')) {
+        updates.push('image_url = ?');
+        values.push(req.body.image_url);
       }
       const result = await q(
         `UPDATE products SET ${updates.join(', ')} WHERE product_id = ?`,
