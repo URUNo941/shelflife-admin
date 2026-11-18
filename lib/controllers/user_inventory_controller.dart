@@ -137,6 +137,7 @@ class UserInventory extends ChangeNotifier {
             ? null
             : parseApiDate(json['created_at'] as String),
         qty: (json['quantity'] as num?)?.toInt() ?? 1,
+        imageUrl: json['image_url'] as String?,
       );
 
   static Map<String, dynamic> _toJson(UserItem item) => {
@@ -145,6 +146,7 @@ class UserInventory extends ChangeNotifier {
         'category': item.category,
         'quantity': item.qty,
         'expiration_date': formatApiDate(item.expiry),
+        'image_url': item.imageUrl,
       };
 
   // ---------------------------------------------------------------------------
@@ -162,6 +164,7 @@ class UserInventory extends ChangeNotifier {
       if (mergeInto != null) {
         final row = await _api.put('/items/${mergeInto.id}', {
           'quantity': mergeInto.qty + item.qty,
+          if (item.imageUrl != null) 'image_url': item.imageUrl,
         });
         _replace(mergeInto.id, itemFromJson(row as Map<String, dynamic>));
         if (replacing != null) {
@@ -191,7 +194,8 @@ class UserInventory extends ChangeNotifier {
         return null;
       }
       try {
-        final row = await _api.put('/items/${item.id}', {'quantity': item.qty - 1});
+        final row =
+            await _api.put('/items/${item.id}', {'quantity': item.qty - 1});
         _replace(item.id, itemFromJson(row as Map<String, dynamic>));
         notifyListeners();
         return null;
@@ -255,6 +259,7 @@ class UserInventory extends ChangeNotifier {
   void save(UserItem item, {UserItem? replacing, UserItem? mergeInto}) {
     if (mergeInto != null) {
       mergeInto.qty += item.qty;
+      mergeInto.imageUrl = item.imageUrl ?? mergeInto.imageUrl;
       if (replacing != null) {
         items.removeWhere((existing) => existing.id == replacing.id);
       }

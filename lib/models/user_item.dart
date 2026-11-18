@@ -20,8 +20,10 @@ class UserItem {
   String name; // ชื่อสินค้า
   String category; // หมวดหมู่: Food / Medicine / Other
   DateTime expiry; // วันหมดอายุ
-  final DateTime addedAt; // วันที่เพิ่มเข้าตู้ (ใช้คำนวณ % อายุที่เหลือ จึงห้ามเปลี่ยน)
+  final DateTime
+      addedAt; // วันที่เพิ่มเข้าตู้ (ใช้คำนวณ % อายุที่เหลือ จึงห้ามเปลี่ยน)
   int qty; // จำนวนชิ้นในล็อตนี้
+  String? imageUrl;
 
   UserItem({
     required this.id,
@@ -31,6 +33,7 @@ class UserItem {
     required this.expiry,
     DateTime? addedAt, // ไม่บังคับส่ง
     this.qty = 1, // ไม่ระบุจำนวน = 1 ชิ้น
+    this.imageUrl,
   }) : addedAt = addedAt ?? DateTime.now();
   // ↑ initializer list (หลังเครื่องหมาย :) ทำงานก่อนสร้าง object เสร็จ
   //   ถ้าไม่ส่ง addedAt มา ให้ใช้ "เวลาตอนนี้" แทน

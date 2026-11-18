@@ -40,6 +40,7 @@ Map<String, dynamic> itemRow({
   int qty = 2,
   String status = 'active',
   String expiry = '2099-01-10',
+  String? imageUrl,
 }) =>
     {
       'item_id': id,
@@ -50,6 +51,7 @@ Map<String, dynamic> itemRow({
       'category': 'Food',
       'quantity': qty,
       'expiration_date': expiry,
+      'image_url': imageUrl,
       'status': status,
       'status_updated_at': null,
       'created_at': '2099-01-01T03:00:00.000Z',
@@ -231,12 +233,15 @@ void main() {
 
   group('UserInventory (API mode)', () {
     test('load maps API rows to items', () async {
-      ApiClient.instance = FakeServer((_) async => json([itemRow()])).client();
+      ApiClient.instance = FakeServer((_) async => json([
+            itemRow(imageUrl: 'http://localhost:3000/uploads/milk.jpg'),
+          ])).client();
       expect(await inventory.load(), isNull);
       final item = inventory.items.single;
       expect(item.id, '7');
       expect(item.name, 'Fresh Milk 1L');
       expect(item.qty, 2);
+      expect(item.imageUrl, 'http://localhost:3000/uploads/milk.jpg');
       expect([item.expiry.year, item.expiry.month, item.expiry.day],
           [2099, 1, 10]);
     });
@@ -284,12 +289,15 @@ void main() {
         () async {
       final server = FakeServer((r) async => json(itemRow(id: 9), 201));
       ApiClient.instance = server.client();
-      final draft = UserInventory.itemFromJson(itemRow(id: 0))..qty = 3;
+      final draft = UserInventory.itemFromJson(itemRow(id: 0))
+        ..qty = 3
+        ..imageUrl = 'http://localhost:3000/uploads/milk.jpg';
       expect(await inventory.saveItem(draft), isNull);
       final body = jsonDecode(server.requests.single.body) as Map;
       expect(body['barcode'], '8850123456789');
       expect(body['quantity'], 3);
       expect(body['expiration_date'], '2099-01-10');
+      expect(body['image_url'], 'http://localhost:3000/uploads/milk.jpg');
       expect(inventory.items.single.id, '9');
     });
 

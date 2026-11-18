@@ -115,8 +115,8 @@ test('ShelfLife API on the V2 database', { skip: !process.env.TEST_DB_HOST }, as
     await t.test('GET /items returns only my active batches with the fields Flutter reads', async () => {
       const { status, body } = await call('GET', '/items', undefined, adminToken);
       assert.equal(status, 200);
-      assert.equal(body.length, 4);
-      for (const field of ['item_id', 'user_id', 'barcode', 'product_name', 'category', 'quantity', 'expiration_date', 'status', 'created_at'])
+      assert.equal(body.length, 6);
+      for (const field of ['item_id', 'user_id', 'barcode', 'product_name', 'category', 'quantity', 'expiration_date', 'image_url', 'status', 'created_at'])
         assert.ok(field in body[0], `missing ${field}`);
       const milk = body.find((i) => i.item_id === 1);
       assert.equal(milk.product_name, 'Fresh Milk 1L');
@@ -126,16 +126,41 @@ test('ShelfLife API on the V2 database', { skip: !process.env.TEST_DB_HOST }, as
       assert.equal((await call('GET', '/items?status=bogus', undefined, sarahToken)).status, 400);
     });
 
+    let uploadedImageUrl;
+    await t.test('image upload requires authentication and serves uploaded images', async () => {
+      const uploadUrl = `${base}/upload`;
+      assert.equal((await fetch(uploadUrl, { method: 'POST' })).status, 401);
+
+      const form = new FormData();
+      form.append('image', new Blob(['test image bytes'], { type: 'image/png' }), 'sample.png');
+      const response = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${sarahToken}` },
+        body: form,
+      });
+      assert.equal(response.status, 200);
+      uploadedImageUrl = (await response.json()).imageUrl;
+      assert.match(uploadedImageUrl, /^http:\/\/127\.0\.0\.1:\d+\/uploads\/[a-f0-9]+\.png$/);
+
+      const imageResponse = await fetch(uploadedImageUrl);
+      assert.equal(imageResponse.status, 200);
+      assert.equal(await imageResponse.text(), 'test image bytes');
+      await fs.promises.unlink(
+        path.join(backend, 'uploads', path.basename(new URL(uploadedImageUrl).pathname)),
+      );
+    });
+
     let sarahItem;
     await t.test('POST /items: known barcode reuses the product, owner comes from the token', async () => {
       const { status, body } = await call('POST', '/items', {
-        user_id: 1, barcode: '8850123456789', product_name: 'Milk', category: 'Food', quantity: 3, expiration_date: '2026-12-01',
+        user_id: 1, barcode: '8850123456789', product_name: 'Milk', category: 'Food', quantity: 3, expiration_date: '2026-12-01', image_url: uploadedImageUrl,
       }, sarahToken);
       assert.equal(status, 201);
       assert.equal(body.user_id, 2); // body.user_id is ignored
       assert.equal(body.product_id, 1);
       assert.equal(body.product_name, 'Fresh Milk 1L');
-      assert.equal((await sql('SELECT COUNT(*) n FROM DB.products'))[0].n, 4);
+      assert.equal(body.image_url, uploadedImageUrl);
+      assert.equal((await sql('SELECT COUNT(*) n FROM DB.products'))[0].n, 6);
       sarahItem = body.item_id;
     });
 
@@ -157,10 +182,15 @@ test('ShelfLife API on the V2 database', { skip: !process.env.TEST_DB_HOST }, as
     });
 
     await t.test('PUT /items/:id edits quantity, expiry and product; status records its time', async () => {
-      const edited = await call('PUT', `/items/${sarahItem}`, { quantity: 2, expiration_date: '2026-12-05' }, sarahToken);
+      const edited = await call('PUT', `/items/${sarahItem}`, {
+        quantity: 2,
+        expiration_date: '2026-12-05',
+        image_url: `${uploadedImageUrl}?updated`,
+      }, sarahToken);
       assert.equal(edited.status, 200);
       assert.equal(edited.body.quantity, 2);
       assert.equal(edited.body.expiration_date, '2026-12-05');
+      assert.equal(edited.body.image_url, `${uploadedImageUrl}?updated`);
       const consumed = await call('PUT', `/items/${sarahItem}`, { status: 'consumed' }, sarahToken);
       assert.equal(consumed.body.status, 'consumed');
       assert.notEqual(consumed.body.status_updated_at, null);
@@ -187,8 +217,8 @@ test('ShelfLife API on the V2 database', { skip: !process.env.TEST_DB_HOST }, as
       const system = await call('GET', '/stats/system?period=all', undefined, adminToken);
       assert.equal(system.status, 200);
       assert.equal(system.body.total_users, 3);
-      assert.equal(system.body.total_products, 5);
-      assert.equal(system.body.active.batches, 5);
+      assert.equal(system.body.total_products, 7);
+      assert.equal(system.body.active.batches, 7);
       // tom123's sample batches expire before today's date in this test run? count only checks the shape
       assert.equal(typeof system.body.expired.batches, 'number');
     });

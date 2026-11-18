@@ -5,7 +5,7 @@
 const ITEM_SELECT = `
   SELECT i.item_id, i.user_id, i.product_id,
          p.barcode, p.product_name, c.category_name AS category,
-         i.quantity, i.expiration_date, i.status, i.status_updated_at,
+         i.quantity, i.expiration_date, i.image_url, i.status, i.status_updated_at,
          i.created_at, i.updated_at
   FROM inventory_items AS i
   JOIN products AS p ON p.product_id = i.product_id

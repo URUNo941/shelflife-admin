@@ -215,7 +215,7 @@ void main() {
     testWidgets('Valid admin credentials open the admin dashboard',
         (tester) async {
       await signIn(tester, username: 'admin', password: '1234');
-      expect(find.text('Admin Console'), findsOneWidget);
+      expect(find.text('System at a glance'), findsOneWidget);
     });
 
     testWidgets('Invalid credentials show an error and stay on login',
@@ -375,7 +375,9 @@ void main() {
         find.byType(TextFormField).at(1),
         'Updated Product Name',
       );
-      await tester.tap(find.byIcon(Icons.add_circle_outline));
+      final increaseQuantity = find.byIcon(Icons.add_circle_outline);
+      await tester.ensureVisible(increaseQuantity);
+      await tester.tap(increaseQuantity);
       await tester.pump();
       await tester.ensureVisible(find.text('Save Changes'));
       await tester.tap(find.text('Save Changes'));

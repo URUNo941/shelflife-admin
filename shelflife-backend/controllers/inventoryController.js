@@ -5,7 +5,7 @@ const { ITEM_SELECT, productIdFor } = require('../utils/catalog');
 // ผู้ใช้เห็น/แก้ได้เฉพาะล็อตของตัวเอง (admin เข้าถึงได้ทุกล็อต)
 
 // คอลัมน์ที่อยู่ในแถว inventory_items เอง
-const itemFields = ['quantity', 'expiration_date', 'status'];
+const itemFields = ['quantity', 'expiration_date', 'status', 'image_url'];
 // ข้อมูลสินค้า อยู่ที่ products/categories (เปลี่ยนแล้วจะชี้ไปสินค้าที่ตรงกัน)
 const productFields = ['barcode', 'product_name', 'category'];
 const validStatuses = ['active', 'consumed', 'discarded'];
@@ -29,6 +29,11 @@ function validateItem(body, partial = false) {
   if (body.quantity !== undefined && (!Number.isInteger(body.quantity) || body.quantity < 1)) return 'quantity must be a positive integer.';
   if (body.expiration_date !== undefined && !validDate(body.expiration_date)) return 'expiration_date must use YYYY-MM-DD format.';
   if (body.status !== undefined && !validStatuses.includes(body.status)) return 'status must be active, consumed or discarded.';
+  if (body.image_url !== undefined &&
+      body.image_url !== null &&
+      (typeof body.image_url !== 'string' || body.image_url.length > 2048)) {
+    return 'image_url must be a URL shorter than 2048 characters or null.';
+  }
   return null;
 }
 
@@ -81,9 +86,17 @@ async function createInventoryItem(req, res) {
       const productId = await productIdFor(q, { ...body, created_by: req.auth.userId });
       const result = await q(
         `INSERT INTO inventory_items
-         (user_id, product_id, quantity, expiration_date, status, status_updated_at)
-         VALUES (?, ?, ?, ?, ?, IF(? = 'active', NULL, CURRENT_TIMESTAMP))`,
-        [req.auth.userId, productId, body.quantity ?? 1, body.expiration_date, status, status],
+         (user_id, product_id, quantity, expiration_date, image_url, status, status_updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, IF(? = 'active', NULL, CURRENT_TIMESTAMP))`,
+        [
+          req.auth.userId,
+          productId,
+          body.quantity ?? 1,
+          body.expiration_date,
+          body.image_url ?? null,
+          status,
+          status,
+        ],
       );
       return result.insertId;
     });

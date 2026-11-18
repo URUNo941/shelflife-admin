@@ -120,13 +120,13 @@ class _UserItemDetailViewState extends State<UserItemDetailView> {
               border: Border.all(color: Colors.grey.shade200),
             ),
             clipBehavior: Clip.antiAlias,
-            child: item.imageUrl != null && item.imageUrl!.isNotEmpty
-                ? Image.network(
+            child: item.imageUrl == null || item.imageUrl!.isEmpty
+                ? _imagePlaceholder(item)
+                : Image.network(
                     item.imageUrl!,
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => _imagePlaceholder(item),
-                  )
-                : _imagePlaceholder(item),
+                  ),
           ),
           const SizedBox(height: 22),
           Row(

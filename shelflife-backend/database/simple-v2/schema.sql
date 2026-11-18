@@ -47,6 +47,7 @@ CREATE TABLE inventory_items (
   product_id INT NOT NULL,
   quantity INT NOT NULL DEFAULT 1,
   expiration_date DATE NOT NULL,
+  image_url VARCHAR(2048) NULL,
   status ENUM('active', 'consumed', 'discarded') NOT NULL DEFAULT 'active',
   status_updated_at TIMESTAMP NULL DEFAULT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

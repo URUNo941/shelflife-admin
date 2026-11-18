@@ -1,39 +1,45 @@
 const multer = require('multer');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
 const uploadDirectory = path.join(__dirname, '..', 'uploads');
 fs.mkdirSync(uploadDirectory, { recursive: true });
 
-// ตั้งค่าที่เก็บไฟล์และการตั้งชื่อไฟล์
+const extensionsByMimeType = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+  'image/gif': '.gif',
+};
+const allowedExtensions = new Set(Object.values(extensionsByMimeType));
+
 const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
+  destination(req, file, cb) {
     cb(null, uploadDirectory);
   },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
+  filename(req, file, cb) {
+    cb(null, `${crypto.randomBytes(16).toString('hex')}${file.safeExtension}`);
   }
 });
 
-// ปรับปรุงตัวกรองให้ยืดหยุ่นขึ้น (ยอมรับไฟล์ที่มีนามสกุลรูปภาพทั่วไป)
 const fileFilter = (req, file, cb) => {
-  // เช็คจากนามสกุลไฟล์โดยตรง (.jpg, .jpeg, .png, .webp, .gif) หรือเช็คจาก mimetype
-  const allowedExtensions = /jpeg|jpg|png|webp|gif/;
-  const extname = allowedExtensions.test(path.extname(file.originalname).toLowerCase());
-  const mimetype = file.mimetype.startsWith('image/');
-
-  if (extname || mimetype) {
-    return cb(null, true);
-  } else {
-    return cb(new Error('รองรับเฉพาะไฟล์รูปภาพ (jpg, png, webp) เท่านั้น!'), false);
+  const extension = path.extname(file.originalname).toLowerCase();
+  const mimeExtension = extensionsByMimeType[file.mimetype];
+  const extensionIsAllowed = allowedExtensions.has(extension);
+  if ((!mimeExtension && file.mimetype !== 'application/octet-stream') ||
+      (!mimeExtension && !extensionIsAllowed)) {
+    return cb(new Error('Choose a JPEG, PNG, WebP or GIF image.'));
   }
+
+  file.safeExtension = mimeExtension || extension;
+  return cb(null, true);
 };
 
-const upload = multer({ 
+const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
-  limits: { fileSize: 5 * 1024 * 1024 } // จำกัดขนาดไม่เกิน 5MB
+  limits: { fileSize: 5 * 1024 * 1024 }
 });
 
-module.exports = upload;
+module.exports = { upload, uploadDirectory };

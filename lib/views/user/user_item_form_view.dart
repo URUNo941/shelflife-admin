@@ -1,10 +1,12 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 
 import '../../controllers/product_controller.dart';
-<<<<<<< Updated upstream
-=======
 import '../../services/api_client.dart';
->>>>>>> Stashed changes
 import 'user_data.dart';
 import 'user_scan_view.dart';
 
@@ -55,6 +57,10 @@ class _UserItemFormViewState extends State<UserItemFormView> {
   late String _category;
   late DateTime _expiry;
   late int _qty;
+  final ImagePicker _imagePicker = ImagePicker();
+  Uint8List? _selectedImageBytes;
+  String? _selectedImageName;
+  bool _isSaving = false;
 
   bool get _isEdit => widget.item != null;
 
@@ -79,25 +85,63 @@ class _UserItemFormViewState extends State<UserItemFormView> {
   String _fmt(DateTime d) =>
       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 
-<<<<<<< Updated upstream
-=======
   Future<void> _pickImage(ImageSource source) async {
     try {
-      final XFile? pickedFile = await _picker.pickImage(
+      final image = await _imagePicker.pickImage(
         source: source,
         imageQuality: 85,
       );
-      if (pickedFile != null && mounted) {
-        setState(() {
-          _selectedImage = pickedFile;
-        });
-      }
-    } catch (e) {
-      if (mounted) _showError('Failed to pick image: $e');
+      if (image == null || !mounted) return;
+      final bytes = await image.readAsBytes();
+      if (!mounted) return;
+      setState(() {
+        _selectedImageBytes = bytes;
+        _selectedImageName = image.name;
+      });
+    } catch (error) {
+      if (mounted) _showError('Could not open image source: $error');
     }
   }
 
->>>>>>> Stashed changes
+  Future<String> _uploadImage() async {
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('${ApiClient.instance.baseUrl}/upload'),
+    );
+    final token = ApiClient.instance.token;
+    if (token != null) {
+      request.headers['Authorization'] = 'Bearer $token';
+    }
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'image',
+        _selectedImageBytes!,
+        filename: _selectedImageName?.isNotEmpty == true
+            ? _selectedImageName!
+            : 'item.jpg',
+      ),
+    );
+
+    final response = await request.send().timeout(const Duration(seconds: 30));
+    final responseText = await response.stream.bytesToString();
+    dynamic body;
+    try {
+      body = jsonDecode(responseText);
+    } on FormatException {
+      body = null;
+    }
+    if (response.statusCode != 200) {
+      final message = body is Map && body['message'] is String
+          ? body['message'] as String
+          : 'Image upload failed (${response.statusCode}).';
+      throw StateError(message);
+    }
+    if (body is! Map || body['imageUrl'] is! String) {
+      throw const FormatException('The server returned an invalid image URL.');
+    }
+    return body['imageUrl'] as String;
+  }
+
   /// เปิดกล้องสแกน แล้วใส่ barcode ที่ได้ลงฟอร์ม
   Future<void> _scanBarcode() async {
     final code = await Navigator.push<String>(
@@ -140,64 +184,10 @@ class _UserItemFormViewState extends State<UserItemFormView> {
   }
 
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
-<<<<<<< Updated upstream
+    if (_isSaving || !_formKey.currentState!.validate()) return;
+    setState(() => _isSaving = true);
     final inv = UserInventory.instance;
     final oldItem = widget.item;
-=======
-
-    String? uploadedImageUrl;
-
-    // ถ้ามีการเลือกรูปใหม่ ให้ยิง API ไปอัปโหลดที่ Backend ก่อน
-    if (_selectedImage != null) {
-      try {
-        final uri = Uri.parse('${ApiClient.instance.baseUrl}/upload');
-        final request = http.MultipartRequest('POST', uri);
-
-        if (kIsWeb) {
-          final bytes = await _selectedImage!.readAsBytes();
-          request.files.add(http.MultipartFile.fromBytes(
-            'image',
-            bytes,
-            filename: _selectedImage!.name,
-          ));
-        } else {
-          request.files.add(
-              await http.MultipartFile.fromPath('image', _selectedImage!.path));
-        }
-
-        final response = await request.send();
-        final responseData = await response.stream.bytesToString();
-        if (!mounted) return;
-        if (response.statusCode != 200) {
-          var message = 'Upload failed (${response.statusCode}).';
-          try {
-            final body = jsonDecode(responseData);
-            if (body is Map && body['message'] is String) {
-              message = body['message'] as String;
-            }
-          } on FormatException {
-            // Keep the HTTP status message when the server does not return JSON.
-          }
-          _showError(message);
-          return;
-        }
-        final body = jsonDecode(responseData);
-        if (body is! Map || body['imageUrl'] is! String) {
-          _showError('Upload failed: the server returned an invalid response.');
-          return;
-        }
-        uploadedImageUrl = body['imageUrl'] as String;
-      } catch (e) {
-        if (mounted) _showError('Error uploading image: $e');
-        return;
-      }
-    }
-
-    final inv = UserInventory.instance;
-    final oldItem = widget.item;
-
->>>>>>> Stashed changes
     final candidate = UserItem(
       id: oldItem?.id ?? inv.newId(),
       barcode: _barcode.text.trim(),
@@ -206,11 +196,8 @@ class _UserItemFormViewState extends State<UserItemFormView> {
       expiry: _expiry,
       addedAt: oldItem?.addedAt,
       qty: _qty,
+      imageUrl: oldItem?.imageUrl,
     );
-<<<<<<< Updated upstream
-=======
-
->>>>>>> Stashed changes
     final matchingBatch = inv.findBatch(
       barcode: candidate.barcode,
       expiry: candidate.expiry,
@@ -244,16 +231,35 @@ class _UserItemFormViewState extends State<UserItemFormView> {
           ],
         ),
       );
-      if (choice == null) return;
+      if (choice == null) {
+        if (mounted) setState(() => _isSaving = false);
+        return;
+      }
       if (!mounted) return;
       if (choice == 'merge') mergeInto = matchingBatch;
     }
 
-    final error =
-        await inv.saveItem(candidate, replacing: oldItem, mergeInto: mergeInto);
-    if (!mounted) return;
-    if (error != null) return _showError(error);
-    Navigator.pop(context);
+    try {
+      if (_selectedImageBytes != null) {
+        candidate.imageUrl = await _uploadImage();
+      }
+      if (!mounted) return;
+      final error = await inv.saveItem(
+        candidate,
+        replacing: oldItem,
+        mergeInto: mergeInto,
+      );
+      if (!mounted) return;
+      if (error != null) {
+        _showError(error);
+        return;
+      }
+      Navigator.pop(context);
+    } catch (error) {
+      if (mounted) _showError(error.toString().replaceFirst('Bad state: ', ''));
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   Future<void> _delete() async {
@@ -266,30 +272,6 @@ class _UserItemFormViewState extends State<UserItemFormView> {
     }
   }
 
-<<<<<<< Updated upstream
-=======
-  // --- ฟังก์ชันแสดงตัวอย่างรูปภาพ ---
-  Widget _buildImagePreview() {
-    if (_selectedImage == null && _isEdit && widget.item!.imageUrl != null) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Image.network(widget.item!.imageUrl!, fit: BoxFit.cover),
-      );
-    }
-
-    if (_selectedImage == null) {
-      return const Icon(Icons.image_outlined, size: 50, color: Colors.grey);
-    }
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: kIsWeb
-          ? Image.network(_selectedImage!.path, fit: BoxFit.cover)
-          : Image.file(File(_selectedImage!.path), fit: BoxFit.cover),
-    );
-  }
-
->>>>>>> Stashed changes
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -306,27 +288,41 @@ class _UserItemFormViewState extends State<UserItemFormView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-<<<<<<< Updated upstream
-=======
-              // --- UI ส่วนเลือกรูปภาพ ---
               Center(
                 child: Column(
                   children: [
                     Container(
                       height: 150,
                       width: 150,
+                      clipBehavior: Clip.antiAlias,
                       decoration: BoxDecoration(
                         color: Colors.grey[200],
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: Colors.grey.shade400),
                       ),
-                      child: _buildImagePreview(),
+                      child: _selectedImageBytes == null
+                          ? widget.item?.imageUrl == null
+                              ? const Icon(
+                                  Icons.image_outlined,
+                                  size: 50,
+                                  color: Colors.grey,
+                                )
+                              : Image.network(
+                                  widget.item!.imageUrl!,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => const Icon(
+                                    Icons.image_outlined,
+                                    size: 50,
+                                    color: Colors.grey,
+                                  ),
+                                )
+                          : Image.memory(_selectedImageBytes!,
+                              fit: BoxFit.cover),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
                     Wrap(
                       alignment: WrapAlignment.center,
                       spacing: 8,
-                      runSpacing: 4,
                       children: [
                         TextButton.icon(
                           onPressed: () => _pickImage(ImageSource.gallery),
@@ -351,9 +347,6 @@ class _UserItemFormViewState extends State<UserItemFormView> {
                 ),
               ),
               const SizedBox(height: 16),
-              // --- สิ้นสุด UI ส่วนรูปภาพ ---
-
->>>>>>> Stashed changes
               TextFormField(
                 controller: _barcode,
                 keyboardType: TextInputType.number,
@@ -447,8 +440,14 @@ class _UserItemFormViewState extends State<UserItemFormView> {
                       backgroundColor: kUserGreen,
                       minimumSize: const Size.fromHeight(48),
                     ),
-                    onPressed: _save,
-                    child: Text(_isEdit ? 'Save Changes' : 'Save'),
+                    onPressed: _isSaving ? null : _save,
+                    child: Text(
+                      _isSaving
+                          ? 'Saving...'
+                          : _isEdit
+                              ? 'Save Changes'
+                              : 'Save',
+                    ),
                   ),
                 ),
               ]),
