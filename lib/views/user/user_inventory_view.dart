@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'user_data.dart';
+import 'user_item_detail_view.dart';
 import 'user_item_form_view.dart';
 
 /// รายการสินค้าของฉัน (หน้า 3 ฝั่ง User): ค้นหา + กรองหมวด + แก้/ลบ
@@ -33,6 +34,13 @@ class _UserInventoryViewState extends State<UserInventoryView> {
   void _openForm([UserItem? item]) {
     Navigator.push(context,
         MaterialPageRoute(builder: (_) => UserItemFormView(item: item)));
+  }
+
+  void _openDetails(UserItem item) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => UserItemDetailView(item: item)),
+    );
   }
 
   void _showError(String? error) {
@@ -250,7 +258,7 @@ class _UserInventoryViewState extends State<UserInventoryView> {
               clipBehavior: Clip.antiAlias,
               child: ListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 10),
-                onTap: () => _openForm(item),
+                onTap: () => _openDetails(item),
                 leading: Icon(Icons.event_outlined, color: item.statusColor),
                 title: Row(
                   children: [
@@ -312,13 +320,16 @@ class _UserInventoryViewState extends State<UserInventoryView> {
                     ),
                     PopupMenuButton<String>(
                       onSelected: (value) => switch (value) {
-                        'edit' => _openForm(item),
+                        'edit' => _openDetails(item),
                         'consumed' => _finish(item, consumed: true),
                         'discarded' => _finish(item, consumed: false),
                         _ => _delete(item),
                       },
                       itemBuilder: (_) => const [
-                        PopupMenuItem(value: 'edit', child: Text('Edit')),
+                        PopupMenuItem(
+                          value: 'edit',
+                          child: Text('View details'),
+                        ),
                         PopupMenuItem(
                             value: 'consumed',
                             child: Text('Mark as consumed')),

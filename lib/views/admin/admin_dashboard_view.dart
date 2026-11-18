@@ -7,8 +7,15 @@ import '../user/login_view.dart' show LoginView;
 
 class AdminDashboardView extends StatelessWidget {
   final ValueChanged<int> onNavigateToTab;
+  final Future<void> Function()? onRefresh;
+  final bool isLoading;
 
-  const AdminDashboardView({super.key, required this.onNavigateToTab});
+  const AdminDashboardView({
+    super.key,
+    required this.onNavigateToTab,
+    this.onRefresh,
+    this.isLoading = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +33,8 @@ class AdminDashboardView extends StatelessWidget {
   Widget _buildContent(BuildContext context) {
     // ตัวเลขทั้งระบบจาก GET /api/stats/system (ทุกผู้ใช้ ไม่ใช่แค่ตู้ของ admin)
     final system = StatsController.instance.system;
-    final totalUsers = system.totalUsers ?? UserController.instance.users.length;
+    final totalUsers =
+        system.totalUsers ?? UserController.instance.users.length;
     final totalBarcodes =
         system.totalProducts ?? ProductController.instance.products.length;
     final inventoryItems = system.active.quantity;
@@ -34,7 +42,7 @@ class AdminDashboardView extends StatelessWidget {
     final adminName = AuthController.instance.currentUser?.username ?? 'Admin';
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20.0),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -96,6 +104,17 @@ class AdminDashboardView extends StatelessWidget {
               ),
               Row(
                 children: [
+                  IconButton(
+                    tooltip: 'Refresh dashboard',
+                    onPressed: isLoading ? null : onRefresh,
+                    icon: isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.refresh_rounded),
+                  ),
                   IconButton(
                     icon:
                         const Icon(Icons.notifications_none_rounded, size: 28),
@@ -188,7 +207,17 @@ class AdminDashboardView extends StatelessWidget {
                                       !context.mounted) {
                                     return;
                                   }
-                                  AuthController.instance.logout();
+                                  try {
+                                    await AuthController.instance.logout();
+                                  } on StateError catch (error) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(SnackBar(
+                                              content: Text(error.message)));
+                                    }
+                                    return;
+                                  }
+                                  if (!context.mounted) return;
                                   Navigator.of(context).pushAndRemoveUntil(
                                     MaterialPageRoute<void>(
                                       builder: (_) => const LoginView(),
@@ -218,11 +247,11 @@ class AdminDashboardView extends StatelessWidget {
                         ),
                       ),
                     ],
-                    child: const CircleAvatar(
+                    child: CircleAvatar(
                       backgroundColor: Color(0xFFDCFCE7),
                       child: Text(
-                        'A',
-                        style: TextStyle(
+                        adminName[0].toUpperCase(),
+                        style: const TextStyle(
                           color: Color(0xFF0D7A53),
                           fontWeight: FontWeight.bold,
                           fontSize: 18,
@@ -234,38 +263,91 @@ class AdminDashboardView extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 16),
-
-          // Title Section
-          const Text(
-            'Admin Console',
-            style: TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Welcome back,',
-            style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-          ),
-          Text(
-            adminName,
-            style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(22),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF0D7A53), Color(0xFF075E41)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF0D7A53).withValues(alpha: 0.18),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'ADMIN CONSOLE',
+                  style: TextStyle(
+                    color: Color(0xFFD1FAE5),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Welcome back, $adminName',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Here is what is happening across ShelfLife today.',
+                  style: TextStyle(color: Color(0xFFE7F7EF), fontSize: 14),
+                ),
+                const SizedBox(height: 18),
+                FilledButton.tonalIcon(
+                  onPressed: () => onNavigateToTab(1),
+                  icon: const Icon(Icons.qr_code_2_rounded),
+                  label: const Text('Manage catalog'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: const Color(0xFF075E41),
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'System at a glance',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              Text(
+                'Live overview',
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
 
-          // Stat Cards Grid
-          GridView.count(
-            crossAxisCount: 2,
+          GridView.extent(
+            maxCrossAxisExtent: 240,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
-            childAspectRatio: 1.4,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 1.35,
             children: [
               _buildStatCard(
                 icon: Icons.people_outline_rounded,

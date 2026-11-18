@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
 import 'user_data.dart';
+import 'user_item_detail_view.dart';
 import 'user_inventory_view.dart';
 import 'user_item_form_view.dart';
+import 'user_notifications_view.dart';
 import 'user_profile_view.dart';
 
-/// โครงหลักฝั่ง User: แท็บ Home / Inventory + ปุ่มเพิ่มสินค้า
+/// โครงหลักฝั่ง User: Home, Inventory, Notifications, Account, and quick add.
 class UserMainView extends StatefulWidget {
   /// เรียกเมื่อผู้ใช้กดยืนยัน Log out (ส่งมาจากจุดที่เปิดหน้านี้ เช่น หลัง login)
   final VoidCallback? onLogout;
@@ -38,36 +40,121 @@ class _UserMainViewState extends State<UserMainView> {
     return Scaffold(
       backgroundColor: const Color(0xFFFCF8FF),
       appBar: AppBar(
-        backgroundColor: kUserGreen,
-        foregroundColor: Colors.white,
-        title: Text(const ['Home', 'My Inventory', 'My Account'][_index]),
+        backgroundColor: const Color(0xFFFCF8FF),
+        title: Text(
+          const ['ShelfLife', 'My Items', 'Notifications', 'My Profile'][_index],
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+        actions: [
+          if (_index != 2)
+            ListenableBuilder(
+              listenable: UserInventory.instance,
+              builder: (context, _) {
+                final alerts = UserInventory.instance.items
+                    .where((item) =>
+                        item.isExpired ||
+                        item.daysLeft <= 3 ||
+                        item.isExpiringSoon ||
+                        item.isCritical)
+                    .length;
+                return IconButton(
+                  tooltip: 'Notifications',
+                  onPressed: () => setState(() => _index = 2),
+                  icon: Badge(
+                    isLabelVisible: alerts > 0,
+                    label: Text('$alerts'),
+                    child: const Icon(Icons.notifications_none_rounded),
+                  ),
+                );
+              },
+            ),
+        ],
       ),
       body: switch (_index) {
-        0 => UserHomeView(onSeeAll: () => setState(() => _index = 1)),
+        0 => UserHomeView(
+            onSeeAll: () => setState(() => _index = 1),
+            onSeeNotifications: () => setState(() => _index = 2),
+          ),
         1 => const UserInventoryView(),
+        2 => const UserNotificationsView(),
         _ => UserProfileView(onLogout: widget.onLogout),
       },
-      floatingActionButton: _index == 2
-          ? null
-          : FloatingActionButton(
-              backgroundColor: kUserGreen,
-              foregroundColor: Colors.white,
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const UserItemFormView()),
+      bottomNavigationBar: _buildBottomBar(),
+    );
+  }
+
+  Widget _buildBottomBar() {
+    return SafeArea(
+      top: false,
+      child: Container(
+        height: 72,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: Colors.grey.shade200)),
+        ),
+        child: Row(
+          children: [
+            _navItem(0, Icons.home_outlined, 'Home'),
+            _navItem(1, Icons.inventory_2_outlined, 'Items'),
+            Expanded(
+              child: Center(
+                child: SizedBox(
+                  width: 54,
+                  height: 54,
+                  child: FloatingActionButton(
+                    heroTag: 'user-quick-add',
+                    tooltip: 'Add item',
+                    elevation: 2,
+                    backgroundColor: kUserGreen,
+                    foregroundColor: Colors.white,
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const UserItemFormView()),
+                    ),
+                    child: const Icon(Icons.add_rounded, size: 30),
+                  ),
+                ),
               ),
-              child: const Icon(Icons.add),
             ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Home'),
-          NavigationDestination(
-              icon: Icon(Icons.inventory_2_outlined), label: 'Inventory'),
-          NavigationDestination(
-              icon: Icon(Icons.person_outline), label: 'Account'),
-        ],
+            _navItem(2, Icons.notifications_none_rounded, 'Alerts'),
+            _navItem(3, Icons.person_outline, 'Account'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _navItem(int index, IconData icon, String label) {
+    final selected = _index == index;
+    return Expanded(
+      child: Semantics(
+        button: true,
+        selected: selected,
+        label: label,
+        child: InkWell(
+          onTap: () => setState(() => _index = index),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon,
+                    size: 22,
+                    color: selected ? kUserGreen : Colors.grey.shade600),
+                const SizedBox(height: 3),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    color: selected ? kUserGreen : Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -76,7 +163,8 @@ class _UserMainViewState extends State<UserMainView> {
 /// หน้า Home ของ User (หน้า 2 ฝั่ง User): สรุปของในตู้ + ของที่ต้องรีบใช้
 class UserHomeView extends StatelessWidget {
   final VoidCallback? onSeeAll;
-  const UserHomeView({super.key, this.onSeeAll});
+  final VoidCallback? onSeeNotifications;
+  const UserHomeView({super.key, this.onSeeAll, this.onSeeNotifications});
 
   @override
   Widget build(BuildContext context) {
@@ -112,7 +200,11 @@ class UserHomeView extends StatelessWidget {
               const SizedBox(height: 16),
               // Smart Alert: เตือนทันทีที่เข้าแอปถ้ามีของหมดอายุ/ใกล้หมดอายุ
               if (expiredBatches > 0 || urgent.isNotEmpty)
-                _SmartAlert(expired: expiredBatches, urgent: urgent.length),
+                _SmartAlert(
+                  expired: expiredBatches,
+                  urgent: urgent.length,
+                  onTap: onSeeNotifications,
+                ),
               const SizedBox(height: 4),
               GridView.count(
                 crossAxisCount: 2,
@@ -156,7 +248,7 @@ class UserHomeView extends StatelessWidget {
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (_) => UserItemFormView(item: item)),
+                          builder: (_) => UserItemDetailView(item: item)),
                     ),
                     title: Text(item.name,
                         style: const TextStyle(fontWeight: FontWeight.w600)),
@@ -212,7 +304,12 @@ class UserHomeView extends StatelessWidget {
 class _SmartAlert extends StatelessWidget {
   final int expired;
   final int urgent;
-  const _SmartAlert({required this.expired, required this.urgent});
+  final VoidCallback? onTap;
+  const _SmartAlert({
+    required this.expired,
+    required this.urgent,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -223,25 +320,42 @@ class _SmartAlert extends StatelessWidget {
       if (urgent > 0) '$urgent should be used soon',
     ];
     return Container(
-      width: double.infinity,
       margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+      child: Material(
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withValues(alpha: 0.4)),
-      ),
-      child: Row(children: [
-        Icon(danger ? Icons.warning_amber_rounded : Icons.notifications_active_outlined,
-            color: color),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            parts.join(' · '),
-            style: TextStyle(color: color, fontWeight: FontWeight.w600),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: color.withValues(alpha: 0.4)),
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(children: [
+                Icon(
+                  danger
+                      ? Icons.warning_amber_rounded
+                      : Icons.notifications_active_outlined,
+                  color: color,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    parts.join(' · '),
+                    style:
+                        TextStyle(color: color, fontWeight: FontWeight.w600),
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: color),
+              ]),
+            ),
           ),
         ),
-      ]),
+      ),
     );
   }
 }

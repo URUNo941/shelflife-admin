@@ -57,7 +57,16 @@ class UserProfileView extends StatelessWidget {
       ),
     );
     if (ok != true || !context.mounted) return;
-    AuthController.instance.logout();
+    try {
+      await AuthController.instance.logout();
+    } on StateError catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.message)));
+      }
+      return;
+    }
+    if (!context.mounted) return;
     if (onLogout != null) {
       onLogout!();
     } else {

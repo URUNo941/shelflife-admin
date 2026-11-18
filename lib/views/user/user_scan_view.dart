@@ -49,21 +49,27 @@ class _UserScanViewState extends State<UserScanView> {
         children: [
           MobileScanner(controller: _controller, onDetect: _onDetect),
           Center(
-            child: Container(
-              width: 260,
-              height: 260,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.white, width: 3),
-                borderRadius: BorderRadius.circular(16),
-              ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final frameWidth =
+                    (constraints.maxWidth - 48).clamp(0.0, 420.0);
+                return Container(
+                  width: frameWidth,
+                  height: 150,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.white, width: 3),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                );
+              },
             ),
           ),
           const Positioned(
-            left: 0,
-            right: 0,
+            left: 16,
+            right: 16,
             bottom: 48,
             child: Text(
-              'Point the camera at the product barcode or QR code',
+              'Keep the full barcode or QR code in the frame. Move closer and avoid glare if it does not scan.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.white, fontSize: 15),
             ),

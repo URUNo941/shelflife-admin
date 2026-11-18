@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/user_model.dart';
 import '../services/api_client.dart';
@@ -19,6 +21,7 @@ class AuthController extends ChangeNotifier {
 
   static final AuthController instance = AuthController();
   static const demoPassword = '1234';
+  static const _sessionTokenKey = 'shelflife.session_token';
 
   final UserController _users;
   final ApiClient? _api;
@@ -60,7 +63,11 @@ class AuthController extends ChangeNotifier {
   // ---------------------------------------------------------------------------
 
   /// คืน null ถ้าสำเร็จ หรือข้อความ error
-  Future<String?> signIn(String username, String password) async {
+  Future<String?> signIn(
+    String username,
+    String password, {
+    bool rememberMe = true,
+  }) async {
     if (!_online) {
       return login(username, password) == null
           ? 'Invalid username or password'
@@ -71,12 +78,71 @@ class AuthController extends ChangeNotifier {
         'username': username.trim(),
         'password': password,
       });
-      _client.token = data['token'] as String;
-      _currentUser = UserModel.fromJson(data['user'] as Map<String, dynamic>);
+      final token = data['token'] as String;
+      final user = UserModel.fromJson(data['user'] as Map<String, dynamic>);
+      try {
+        final preferences = await SharedPreferences.getInstance();
+        final saved = rememberMe
+            ? await preferences.setString(_sessionTokenKey, token)
+            : await preferences.remove(_sessionTokenKey);
+        if (!saved) return 'Could not save your sign-in preference.';
+      } on PlatformException catch (error) {
+        return 'Could not save your sign-in preference: ${error.message ?? error.code}';
+      } on MissingPluginException catch (error) {
+        return 'Could not save your sign-in preference: ${error.message}';
+      }
+      _client.token = token;
+      _currentUser = user;
       notifyListeners();
       return null;
     } on ApiException catch (e) {
       return e.statusCode == 401 ? 'Invalid username or password' : e.message;
+    }
+  }
+
+  /// Restore a remembered session and validate it with the backend.
+  /// A network/server failure keeps the saved token so the user can retry.
+  Future<String?> restoreSession() async {
+    if (!_online) return null;
+
+    final SharedPreferences preferences;
+    try {
+      preferences = await SharedPreferences.getInstance();
+      final savedToken = preferences.getString(_sessionTokenKey);
+      if (savedToken == null || savedToken.isEmpty) return null;
+
+      _client.token = savedToken;
+      final data = await _client.get('/auth/me');
+      _currentUser = UserModel.fromJson(data as Map<String, dynamic>);
+      notifyListeners();
+      return null;
+    } on ApiException catch (error) {
+      if (error.statusCode == 401 || error.statusCode == 404) {
+        _client.token = null;
+        _currentUser = null;
+        try {
+          await _clearSavedSession();
+        } on StateError catch (storageError) {
+          return storageError.message;
+        }
+        notifyListeners();
+        return null;
+      }
+      return error.message;
+    } on PlatformException catch (error) {
+      return 'Could not restore your saved session: ${error.message ?? error.code}';
+    } on MissingPluginException catch (error) {
+      return 'Could not restore your saved session: ${error.message}';
+    } on FormatException catch (error) {
+      _client.token = null;
+      _currentUser = null;
+      try {
+        await _clearSavedSession();
+      } on StateError catch (storageError) {
+        return storageError.message;
+      }
+      notifyListeners();
+      return 'The saved session is invalid: ${error.message}';
     }
   }
 
@@ -106,7 +172,7 @@ class AuthController extends ChangeNotifier {
   }
 
   /// ออกจากระบบ: ทิ้ง token และล้างข้อมูลของผู้ใช้คนเดิมออกจากหน่วยความจำ
-  void logout() {
+  Future<void> logout() async {
     _currentUser = null;
     if (_online) {
       _client.token = null;
@@ -116,6 +182,25 @@ class AuthController extends ChangeNotifier {
       UserController.instance.clearCache();
     }
     notifyListeners();
+    if (_online) await _clearSavedSession();
+  }
+
+  Future<void> _clearSavedSession() async {
+    try {
+      final removed =
+          await (await SharedPreferences.getInstance()).remove(_sessionTokenKey);
+      if (!removed) {
+        throw StateError('Could not clear the saved sign-in session.');
+      }
+    } on PlatformException catch (error) {
+      throw StateError(
+        'Could not clear the saved sign-in session: ${error.message ?? error.code}',
+      );
+    } on MissingPluginException catch (error) {
+      throw StateError(
+        'Could not clear the saved sign-in session: ${error.message}',
+      );
+    }
   }
 
   // ---------------------------------------------------------------------------

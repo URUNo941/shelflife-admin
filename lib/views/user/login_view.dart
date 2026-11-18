@@ -19,7 +19,7 @@ class _LoginViewState extends State<LoginView> {
   final TextEditingController _passwordController = TextEditingController();
 
   bool _obscurePassword = true;
-  bool _rememberMe = false;
+  bool _rememberMe = true;
 
   bool _loading = false;
 
@@ -30,6 +30,7 @@ class _LoginViewState extends State<LoginView> {
     final error = await AuthController.instance.signIn(
       _emailController.text.trim(),
       _passwordController.text,
+      rememberMe: _rememberMe,
     );
     if (!mounted) return;
     setState(() => _loading = false);

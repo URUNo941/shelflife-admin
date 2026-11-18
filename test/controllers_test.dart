@@ -13,7 +13,8 @@ void main() {
 
     test('add inserts a new user at the top with the next id', () {
       final before = users.users.length;
-      final maxId = users.users.map((u) => u.userId).reduce((a, b) => a > b ? a : b);
+      final maxId =
+          users.users.map((u) => u.userId).reduce((a, b) => a > b ? a : b);
 
       expect(users.add(username: '  newbie ', role: 'User'), isNull);
       expect(users.users.length, before + 1);
@@ -95,7 +96,9 @@ void main() {
 
       expect(
         products.update(rice.productId,
-            barcode: '1234567890', productName: 'Jasmine Rice', category: 'Food'),
+            barcode: '1234567890',
+            productName: 'Jasmine Rice',
+            category: 'Food'),
         isNull,
       );
       expect(products.findByBarcode('1234567890')!.productName, 'Jasmine Rice');
@@ -105,7 +108,8 @@ void main() {
       expect(products.delete(rice.productId), isFalse);
     });
 
-    test('update keeps its own barcode but rejects another product barcode', () {
+    test('update keeps its own barcode but rejects another product barcode',
+        () {
       final milk = products.findByBarcode('8850123456789')!;
       expect(
         products.update(milk.productId,
@@ -130,12 +134,17 @@ void main() {
         ['Fresh Milk'],
       );
       expect(
-        products.search(category: 'Medicine').every((p) => p.category == 'Medicine'),
+        products
+            .search(category: 'Medicine')
+            .every((p) => p.category == 'Medicine'),
         isTrue,
       );
       final byName =
           products.search(sortBy: 'Name').map((p) => p.productName).toList();
-      expect(byName, [...byName]..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase())));
+      expect(
+          byName,
+          [...byName]
+            ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase())));
     });
 
     test('categories and counts reflect the catalog', () {
@@ -171,9 +180,9 @@ void main() {
       expect(auth.isLoggedIn, isFalse);
     });
 
-    test('logout clears the current user', () {
+    test('logout clears the current user', () async {
       auth.login('user', '1234');
-      auth.logout();
+      await auth.logout();
       expect(auth.currentUser, isNull);
     });
 
@@ -182,18 +191,21 @@ void main() {
           auth.register(username: 'ab', email: 'a@b.co', password: 'secret1'),
           'At least 3 characters');
       expect(
-          auth.register(username: 'abc', email: 'not-an-email', password: 'secret1'),
+          auth.register(
+              username: 'abc', email: 'not-an-email', password: 'secret1'),
           'Invalid email');
       expect(auth.register(username: 'abc', email: 'a@b.co', password: '123'),
           'At least 6 characters');
       expect(
-          auth.register(username: 'sarah', email: 'a@b.co', password: 'secret1'),
+          auth.register(
+              username: 'sarah', email: 'a@b.co', password: 'secret1'),
           'Username already exists');
     });
 
     test('a registered user can log in with their own password only', () {
       expect(
-        auth.register(username: 'mint', email: 'mint@example.com', password: 'secret1'),
+        auth.register(
+            username: 'mint', email: 'mint@example.com', password: 'secret1'),
         isNull,
       );
       expect(users.findByUsername('mint')?.email, 'mint@example.com');

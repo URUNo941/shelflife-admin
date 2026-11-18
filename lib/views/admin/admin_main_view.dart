@@ -16,6 +16,7 @@ class AdminMainView extends StatefulWidget {
 
 class _AdminMainViewState extends State<AdminMainView> {
   int _currentIndex = 0;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -25,6 +26,7 @@ class _AdminMainViewState extends State<AdminMainView> {
 
   /// โหลดข้อมูลจริงจาก backend ตอนเข้าหน้า admin (โหมด test ไม่ทำอะไร)
   Future<void> _load() async {
+    if (mounted) setState(() => _isLoading = true);
     final errors = await Future.wait([
       UserController.instance.load(),
       ProductController.instance.load(),
@@ -36,12 +38,15 @@ class _AdminMainViewState extends State<AdminMainView> {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(error)));
     }
+    if (mounted) setState(() => _isLoading = false);
   }
 
   @override
   Widget build(BuildContext context) {
     final List<Widget> pages = [
       AdminDashboardView(
+        isLoading: _isLoading,
+        onRefresh: _load,
         onNavigateToTab: (index) {
           setState(() {
             _currentIndex = index;
@@ -73,34 +78,33 @@ class _AdminMainViewState extends State<AdminMainView> {
           children: pages,
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _currentIndex,
+        onDestinationSelected: (index) {
           setState(() {
             _currentIndex = index;
           });
         },
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: const Color(0xFF0D7A53),
-        unselectedItemColor: Colors.grey.shade500,
-        selectedLabelStyle:
-            const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-        unselectedLabelStyle: const TextStyle(fontSize: 12),
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_rounded),
+        indicatorColor: const Color(0xFFDCFCE7),
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home_rounded),
             label: 'Dashboard',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.assignment_outlined),
+          NavigationDestination(
+            icon: Icon(Icons.inventory_2_outlined),
+            selectedIcon: Icon(Icons.inventory_2_rounded),
             label: 'Catalog',
           ),
-          BottomNavigationBarItem(
+          NavigationDestination(
             icon: Icon(Icons.people_outline_rounded),
+            selectedIcon: Icon(Icons.people_rounded),
             label: 'Users',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.insert_chart_outlined_rounded),
+          NavigationDestination(
+            icon: Icon(Icons.insights_outlined),
+            selectedIcon: Icon(Icons.insights_rounded),
             label: 'Analytics',
           ),
         ],
