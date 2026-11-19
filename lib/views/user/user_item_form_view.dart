@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
@@ -100,6 +101,37 @@ class _UserItemFormViewState extends State<UserItemFormView> {
       });
     } catch (error) {
       if (mounted) _showError('Could not open image source: $error');
+    }
+  }
+
+  Future<void> _takePicture() async {
+    try {
+      final cameras = await availableCameras();
+      if (!mounted) return;
+      if (cameras.isEmpty) throw StateError('No camera was found.');
+      final camera = cameras.firstWhere(
+        (camera) => camera.lensDirection == CameraLensDirection.back,
+        orElse: () => cameras.first,
+      );
+      final image = await Navigator.push<XFile>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => _CameraCaptureView(camera: camera),
+        ),
+      );
+      if (image == null || !mounted) return;
+      final bytes = await image.readAsBytes();
+      if (!mounted) return;
+      setState(() {
+        _selectedImageBytes = bytes;
+        _selectedImageName = image.name;
+      });
+    } on CameraException catch (error) {
+      if (mounted) {
+        _showError(error.description ?? 'Could not open camera: ${error.code}');
+      }
+    } catch (error) {
+      if (mounted) _showError('Could not open camera: $error');
     }
   }
 
@@ -324,16 +356,17 @@ class _UserItemFormViewState extends State<UserItemFormView> {
                       alignment: WrapAlignment.center,
                       spacing: 8,
                       children: [
-                        TextButton.icon(
+                        OutlinedButton.icon(
                           onPressed: () => _pickImage(ImageSource.gallery),
                           icon: const Icon(Icons.photo_library_outlined),
                           label: const Text('Select Image'),
-                          style: TextButton.styleFrom(
+                          style: OutlinedButton.styleFrom(
                             foregroundColor: kUserGreen,
+                            side: const BorderSide(color: kUserGreen),
                           ),
                         ),
                         OutlinedButton.icon(
-                          onPressed: () => _pickImage(ImageSource.camera),
+                          onPressed: _takePicture,
                           icon: const Icon(Icons.camera_alt_outlined),
                           label: const Text('Take Picture'),
                           style: OutlinedButton.styleFrom(
@@ -453,6 +486,112 @@ class _UserItemFormViewState extends State<UserItemFormView> {
               ]),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CameraCaptureView extends StatefulWidget {
+  final CameraDescription camera;
+
+  const _CameraCaptureView({required this.camera});
+
+  @override
+  State<_CameraCaptureView> createState() => _CameraCaptureViewState();
+}
+
+class _CameraCaptureViewState extends State<_CameraCaptureView> {
+  late final CameraController _controller;
+  late final Future<void> _initializeCamera;
+  bool _isTakingPicture = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = CameraController(
+      widget.camera,
+      ResolutionPreset.medium,
+      enableAudio: false,
+    );
+    _initializeCamera = _controller.initialize();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _capture() async {
+    if (_isTakingPicture || !_controller.value.isInitialized) return;
+    setState(() => _isTakingPicture = true);
+    try {
+      final image = await _controller.takePicture();
+      if (mounted) Navigator.pop(context, image);
+    } on CameraException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error.description ?? 'Could not take picture: ${error.code}',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isTakingPicture = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Take Picture'),
+        backgroundColor: kUserGreen,
+        foregroundColor: Colors.white,
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: Center(
+                child: FutureBuilder<void>(
+                  future: _initializeCamera,
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return const Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Text(
+                          'Could not start the camera. Check camera permission '
+                          'and use HTTPS or localhost in a browser.',
+                          textAlign: TextAlign.center,
+                        ),
+                      );
+                    }
+                    if (snapshot.connectionState != ConnectionState.done ||
+                        !_controller.value.isInitialized) {
+                      return const CircularProgressIndicator();
+                    }
+                    return CameraPreview(_controller);
+                  },
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: FilledButton.icon(
+                onPressed: _isTakingPicture ? null : _capture,
+                icon: const Icon(Icons.camera_alt_outlined),
+                label: Text(_isTakingPicture ? 'Capturing...' : 'Capture'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: kUserGreen,
+                  minimumSize: const Size.fromHeight(48),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

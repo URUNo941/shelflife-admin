@@ -218,8 +218,9 @@ class _RegisterViewState extends State<RegisterView> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       const Text('Already have an account?', style: TextStyle(fontSize: 13)),
                       TextButton(

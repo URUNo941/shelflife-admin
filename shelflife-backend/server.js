@@ -47,6 +47,15 @@ app.use((error, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
+});
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`\n❌ Error: Port ${PORT} is already in use by another process!`);
+    console.error(`👉 เซิร์ฟเวอร์กำลังรันอยู่แล้วในระบบ (หรือมี Node.js ตัวอื่นเปิดค้างไว้ที่ Port ${PORT})\n`);
+  } else {
+    console.error('Server error:', err);
+  }
 });

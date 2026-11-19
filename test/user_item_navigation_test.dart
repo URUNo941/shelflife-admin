@@ -63,6 +63,14 @@ void main() {
     expect(find.text('Add Item'), findsOneWidget);
     expect(find.text('Select Image'), findsOneWidget);
     expect(find.text('Take Picture'), findsOneWidget);
+    for (final label in ['Select Image', 'Take Picture']) {
+      final button = tester.widget<OutlinedButton>(
+        find.widgetWithText(OutlinedButton, label),
+      );
+      expect(
+          button.style?.side?.resolve({}), const BorderSide(color: kUserGreen));
+      expect(button.onPressed, isNotNull);
+    }
   });
 
   testWidgets('admin dashboard has refreshed overview and navigation',
