@@ -223,7 +223,7 @@ void main() {
       final items = data.map((json) => InventoryItemModel.fromJson(json)).toList(); // แปลงเป็นรายการ Model
 
       // ตรวจสอบผลลัพธ์
-      expect(items, isA<List<InventoryItemModel>>()); // ชนิดข้อมูลต้องถูกต้อง
+      expect(items, isA<List<InventoryItemModel>>()); // lชนิดข้อมูลต้องถูกต้อง
       expect(items.length, 1); // ต้องมีจำนวน 1 รายการ
       expect(items[0].productName, 'Fresh Milk'); // ชื่อสินค้าต้องตรงกับที่จำลองไว้
     });
