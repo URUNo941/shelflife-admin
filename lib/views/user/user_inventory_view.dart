@@ -203,17 +203,13 @@ class _UserInventoryViewState extends State<UserInventoryView> {
                   leading: Container(
                     width: 44,
                     height: 44,
+                    clipBehavior: Clip.antiAlias,
                     decoration: BoxDecoration(
                       color: productBatches.first.statusColor
                           .withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(
-                      productBatches.first.category == 'Medicine'
-                          ? Icons.medication_outlined
-                          : Icons.restaurant_outlined,
-                      color: productBatches.first.statusColor,
-                    ),
+                    child: _productImage(productBatches),
                   ),
                   title: Text(
                     '${productBatches.first.name}  ×${productBatches.fold<int>(0, (total, item) => total + item.qty)}',
@@ -229,6 +225,26 @@ class _UserInventoryViewState extends State<UserInventoryView> {
           ],
         );
       },
+    );
+  }
+
+  Widget _productImage(List<UserItem> productBatches) {
+    final imageUrl = productBatches
+        .map((item) => item.imageUrl)
+        .firstWhere((url) => url?.isNotEmpty == true, orElse: () => null);
+    final firstItem = productBatches.first;
+    final fallback = Icon(
+      firstItem.category == 'Medicine'
+          ? Icons.medication_outlined
+          : Icons.restaurant_outlined,
+      color: firstItem.statusColor,
+    );
+
+    if (imageUrl == null) return fallback;
+    return Image.network(
+      imageUrl,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => fallback,
     );
   }
 

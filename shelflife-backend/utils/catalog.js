@@ -14,7 +14,14 @@ const ITEM_SELECT = `
 const PRODUCT_SELECT = `
   SELECT p.product_id, p.barcode, p.product_name,
          c.category_name AS category, p.category_id,
-         p.created_by, p.created_at
+         p.created_by, p.created_at,
+         (SELECT i.image_url
+          FROM inventory_items AS i
+          WHERE i.product_id = p.product_id
+            AND i.image_url IS NOT NULL
+            AND i.image_url <> ''
+          ORDER BY i.updated_at DESC, i.item_id DESC
+          LIMIT 1) AS image_url
   FROM products AS p
   JOIN categories AS c ON c.category_id = p.category_id`;
 

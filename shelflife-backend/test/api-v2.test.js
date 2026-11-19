@@ -160,6 +160,12 @@ test('ShelfLife API on the V2 database', { skip: !process.env.TEST_DB_HOST }, as
       assert.equal(body.product_id, 1);
       assert.equal(body.product_name, 'Fresh Milk 1L');
       assert.equal(body.image_url, uploadedImageUrl);
+      const catalog = await call('GET', '/products', undefined, adminToken);
+      assert.equal(catalog.status, 200);
+      assert.equal(
+        catalog.body.find((product) => product.product_id === body.product_id).image_url,
+        uploadedImageUrl,
+      );
       assert.equal((await sql('SELECT COUNT(*) n FROM DB.products'))[0].n, 6);
       sarahItem = body.item_id;
     });

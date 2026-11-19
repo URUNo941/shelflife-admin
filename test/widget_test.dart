@@ -578,6 +578,7 @@ void main() {
         category: 'Food',
         expiry: soonExpiry,
         qty: 2,
+        imageUrl: 'http://localhost:3000/uploads/list-product.png',
       );
       final laterBatch = UserItem(
         id: 'widget-list-later',
@@ -601,6 +602,16 @@ void main() {
 
       // หัวการ์ดแสดงจำนวนรวมทุกล็อต: 2 + 1 = ×3
       expect(find.text('List Test Product  ×3'), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is Image &&
+              widget.image is NetworkImage &&
+              (widget.image as NetworkImage).url ==
+                  'http://localhost:3000/uploads/list-product.png',
+        ),
+        findsOneWidget,
+      );
       // textContaining = ข้อความยาวกว่านี้ได้ แค่ต้องมีคำว่า "2 expiry batches"
       expect(find.textContaining('2 expiry batches'), findsOneWidget);
       // ทั้ง 2 ล็อตแสดงวันหมดอายุของตัวเอง (รูปแบบ dd/mm/yyyy)

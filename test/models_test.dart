@@ -70,6 +70,7 @@ void main() {
         'category': 'Food',
         'created_by': 1,
         'created_at': '2026-11-03T13:27:43.000Z',
+        'image_url': 'http://localhost:3000/uploads/milk.png',
       });
 
       expect(product.productId, 1);
@@ -77,6 +78,7 @@ void main() {
       expect(product.productName, 'Fresh Milk 1L');
       expect(product.category, 'Food');
       expect(product.createdBy, 1);
+      expect(product.imageUrl, 'http://localhost:3000/uploads/milk.png');
     });
 
     test('missing category defaults to General and created_by may be null',

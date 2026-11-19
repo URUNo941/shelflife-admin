@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:myapp/controllers/product_controller.dart';
+import 'package:myapp/models/product_model.dart';
 import 'package:myapp/services/api_client.dart';
+import 'package:myapp/views/admin/admin_main_view.dart';
+import 'package:myapp/views/admin/master_catalog_view.dart';
 import 'package:myapp/views/user/user_data.dart';
 import 'package:myapp/views/user/user_item_detail_view.dart';
 import 'package:myapp/views/user/user_item_form_view.dart';
 import 'package:myapp/views/user/user_main_view.dart';
 import 'package:myapp/views/user/user_notifications_view.dart';
-import 'package:myapp/views/admin/admin_main_view.dart';
 
 void main() {
   final inventory = UserInventory.instance;
@@ -72,5 +75,39 @@ void main() {
     expect(find.text('Welcome back, Admin'), findsOneWidget);
     expect(find.byType(NavigationBar), findsOneWidget);
     expect(find.byTooltip('Refresh dashboard'), findsOneWidget);
+  });
+
+  testWidgets('admin catalog displays an uploaded product image',
+      (tester) async {
+    final controller = ProductController(
+      seed: [
+        ProductModel(
+          productId: 1,
+          barcode: '8850123456789',
+          productName: 'Fresh Milk',
+          category: 'Food',
+          createdAt: DateTime(2026),
+          imageUrl: 'http://localhost:3000/uploads/fresh-milk.png',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MasterCatalogView(controller: controller),
+      ),
+    );
+    await tester.pump();
+
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Image &&
+            widget.image is NetworkImage &&
+            (widget.image as NetworkImage).url ==
+                'http://localhost:3000/uploads/fresh-milk.png',
+      ),
+      findsOneWidget,
+    );
   });
 }

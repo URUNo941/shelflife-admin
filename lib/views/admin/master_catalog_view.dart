@@ -353,11 +353,26 @@ class _MasterCatalogViewState extends State<MasterCatalogView> {
                               leading: Container(
                                 width: 48,
                                 height: 48,
+                                clipBehavior: Clip.antiAlias,
                                 decoration: BoxDecoration(
                                   color: Colors.grey.shade100,
                                   borderRadius: BorderRadius.circular(10),
                                 ),
-                                child: const Icon(Icons.shopping_bag_outlined, color: Color(0xFF0D7A53)),
+                                child: item.imageUrl == null ||
+                                        item.imageUrl!.isEmpty
+                                    ? const Icon(
+                                        Icons.shopping_bag_outlined,
+                                        color: Color(0xFF0D7A53),
+                                      )
+                                    : Image.network(
+                                        item.imageUrl!,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) =>
+                                            const Icon(
+                                          Icons.shopping_bag_outlined,
+                                          color: Color(0xFF0D7A53),
+                                        ),
+                                      ),
                               ),
                               title: Text(
                                 item.barcode,

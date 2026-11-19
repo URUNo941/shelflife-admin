@@ -17,6 +17,7 @@ class ProductModel {
   final int? createdBy; // user_id ของ Admin ที่เพิ่มสินค้า
   // `int?` = เป็น null ได้ (เช่นข้อมูลเก่าที่ไม่รู้ว่าใครเพิ่ม หรือ admin คนนั้นถูกลบไปแล้ว)
   final DateTime createdAt; // วันที่เพิ่มเข้าระบบ
+  final String? imageUrl;
 
   const ProductModel({
     required this.productId,
@@ -25,6 +26,7 @@ class ProductModel {
     this.category = 'General', // ไม่ระบุหมวด = 'General' (ตรงกับ DEFAULT ใน DB)
     this.createdBy, // ไม่บังคับ เพราะเป็น null ได้
     required this.createdAt,
+    this.imageUrl,
   });
 
   // ---------------------------------------------------------------------------
@@ -45,6 +47,7 @@ class ProductModel {
       createdAt: json['created_at'] == null
           ? DateTime.now()
           : DateTime.parse(json['created_at'] as String).toLocal(), // UTC -> เวลาเครื่อง
+      imageUrl: json['image_url'] as String?,
     );
   }
 
@@ -57,6 +60,7 @@ class ProductModel {
         'category': category,
         'created_by': createdBy,
         'created_at': createdAt.toIso8601String(),
+        'image_url': imageUrl,
       };
 
   // copyWith: ใช้ตอน Admin แก้ไขสินค้า สร้าง object ใหม่ที่เปลี่ยนเฉพาะ field ที่ส่งมา
@@ -67,6 +71,7 @@ class ProductModel {
     String? barcode,
     String? productName,
     String? category,
+    String? imageUrl,
   }) {
     return ProductModel(
       productId: productId,
@@ -75,6 +80,7 @@ class ProductModel {
       category: category ?? this.category,
       createdBy: createdBy,
       createdAt: createdAt,
+      imageUrl: imageUrl ?? this.imageUrl,
     );
   }
 }
